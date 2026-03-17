@@ -116,6 +116,11 @@ You’ll see:
 * Night 2 progression
 * Updated Grimoire
 
+### Run Tests
+```bash
+PYTHONPATH=src pytest -v
+```
+
 ---
 
 ## Grimoire / Board Output
