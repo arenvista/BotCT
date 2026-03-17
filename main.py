@@ -1,5 +1,5 @@
 import random
-from typing import List
+from typing import List, Dict
 
 class Role: 
     def __init__(self, name_player: str, name_role: str):
@@ -39,42 +39,48 @@ class RoleDistributor:
 
 
 class GameMgr:
-    ROLES_DEMONS = ["Imp"]
-    ROLES_TOWNSFOLK = [
-        "Washerwoman", 
-        "Librarian",
-        "Investigtor",
-        "Chef",
-        "Empath",
-        "Fortune Teller",
-        "Undertaker",
-        "Monk",
-        "Ravenkeeper",
-        "Virgin",
-        "Slayer",
-        "Soldier",
-        "Mayor"
+    ROLES_DEMONS: List[Dict[str, str]] = [
+        {"role": "Imp", "role_description": "Each night*, choose a player: they die. If you kill yourself this way, a Minion becomes the Imp."}
     ]
-    ROLES_OUTSIDERS = [
-        "Butler",
-        "Drunk",
-        "Recluse",
-        "Saint"
+    
+    ROLES_MINIONS: List[Dict[str, str]] = [ 
+        {"role": "Poisoner", "role_description": "Each night, choose a player: they are poisoned tonight and tomorrow day."},
+        {"role": "Spy", "role_description": "Each night, you see the Grimoire. You might register as good & as a Townsfolk or Outsider, even if dead."},
+        {"role": "Baron", "role_description": "There are extra Outsiders in play. [+2 Outsiders]"},
+        {"role": "Scarlet Woman", "role_description": "If there are 5 or more players alive & the Demon dies, you become the Demon. (Travellers don't count.)"},
     ]
-    ROLES_MINIONS = [
-        "Poisoner",
-        "Spy", 
-        "Baron", 
-        "Scarlet Woman"
+    
+    # FIXED: Renamed from ROLES_TOWNSFOLK to ROLES_OUTSIDERS
+    ROLES_OUTSIDERS: List[Dict[str, str]] = [
+        {"role": "Butler", "role_description": "Each night, choose a player (not yourself): tomorrow, you may only vote if they are voting too."},
+        {"role": "Drunk", "role_description": "You do not know you are the Drunk. You think you are a Townsfolk character, but you are not."},
+        {"role": "Recluse", "role_description": "You might register as evil & as a Minion or Demon, even if dead."},
+        {"role": "Saint", "role_description": "If you die by execution, your team loses."},
+    ]
+    
+    ROLES_TOWNSFOLK: List[Dict[str, str]] = [
+        {"role": "Washerwoman", "role_description": "You start knowing that 1 of 2 players is a particular Townsfolk."},
+        {"role": "Librarian", "role_description": "You start knowing that 1 of 2 players is a particular Outsider. (Or that zero are in play.)"},
+        {"role": "Investigator", "role_description": "You start knowing that 1 of 2 players is a particular Minion."},
+        {"role": "Chef", "role_description": "You start knowing how many pairs of evil players there are."},
+        {"role": "Empath", "role_description": "Each night, you learn how many of your 2 alive neighbors are evil."},
+        {"role": "Fortune Teller", "role_description": "Each night, choose 2 players: you learn if either is a Demon. There is a good player that registers as a Demon to you."},
+        {"role": "Undertaker", "role_description": "Each night*, you learn which character died by execution today."},
+        {"role": "Monk", "role_description": "Each night*, choose a player (not yourself): they are safe from the Demon tonight."},
+        {"role": "Ravenkeeper", "role_description": "If you die at night, you are woken to choose a player: you learn their character."},
+        {"role": "Virgin", "role_description": "The 1st time you are nominated, if the nominator is a Townsfolk, they are executed immediately."},
+        {"role": "Slayer", "role_description": "Once per game, during the day, publicly choose a player: if they are the Demon, they die."},
+        {"role": "Soldier", "role_description": "You are safe from the Demon."},
+        {"role": "Mayor", "role_description": "If only 3 players live & no execution occurs, your team wins. If you die at night, another player might die instead."},
     ]
 
     def __init__(self, players: List[str]):
-        self.players: List[str] = players
+        self.players = players
         self.num_players = len(players)
         self.roles_distribution = RoleDistributor(self.players)
-        self.player_roles: List[Role] = self.AssignRoles()
+        self.player_roles: List[Role] = self.assign_roles()
 
-    def AssignRoles(self) -> List[Role]:
+    def assign_roles(self) -> List[Role]:
         # Get the target counts from our distributor
         d_count = self.roles_distribution.num_demons
         o_count = self.roles_distribution.num_outsiders
@@ -98,10 +104,14 @@ class GameMgr:
         # Shuffle the bag so player assignment is completely random
         random.shuffle(all_selected_roles)
 
-        #  Pair up each player with a role from the shuffled bag
+        # Pair up each player with a role from the shuffled bag
         assigned_roles = []
-        for player, role_name in zip(self.players, all_selected_roles):
-            print(player, role_name)
+        for player, role_data in zip(self.players, all_selected_roles):
+            # Extract just the string name for the role instantiation
+            role_name = role_data["role"] 
+            print(f"Assigning {player} -> {role_name}")
+            
+            # Assuming the Role class expects a player name and a role name string
             assigned_roles.append(Role(player, role_name))
 
         return assigned_roles
