@@ -8,7 +8,7 @@ class PoisonerBehavior(RoleBehavior):
     first_night_priority = 1
     other_night_priority = 1
 
-    def act(self, player: 'Player', game: 'GameManager') -> None:
+    def act(self, player: Player, game: GameManager) -> None:
         prompt = f"\nWake {player.believed_role} ({player.player_name}). Who do they poison?"
         print(prompt)
         target = game.get_player_by_name() 
@@ -20,7 +20,7 @@ class SpyBehavior(RoleBehavior):
     first_night_priority = 2
     other_night_priority = 3
 
-    def act(self, player: 'Player', game: 'GameManager') -> None:
+    def act(self, player: Player, game: GameManager) -> None:
         prompt = f"\nWake {player.believed_role} ({player.player_name}). Show them the Grimoire. Put to sleep."
         print(prompt)
 
@@ -28,7 +28,7 @@ class SpyBehavior(RoleBehavior):
 class ScarletWomanBehavior(RoleBehavior):
     other_night_priority = 4
 
-    def act(self, player: 'Player', game: 'GameManager') -> None:
+    def act(self, player: Player, game: GameManager) -> None:
         imp = game.get_player_by_role(RoleName.IMP)
         alive_players = sum(1 for p in game.players if p.alive)
         

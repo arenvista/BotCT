@@ -10,6 +10,7 @@ if TYPE_CHECKING:
     from botc.player import Player
     from botc.game import GameManager
 
+
 class RoleBehavior(ABC):
     first_night_priority: Optional[int] = None
     other_night_priority: Optional[int] = None
