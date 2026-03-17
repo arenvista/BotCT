@@ -1,5 +1,5 @@
 import random
-from typing import List, Dict
+from typing import List, Dict, Optional
 
 class Role: 
     def __init__(self, name_player: str, name_role: str):
@@ -7,22 +7,95 @@ class Role:
         self.name_role: str  = name_role
         self.alive: bool = True
         self.poisoned: bool = False
+        self.protected: bool = False
+        self.class_role: str = "NULL"
+
+    # We pass 'game' in so the role can see the board and interact with others
+    def TakeAction(self, game: 'GameMgr'):
+        # If they are dead (and not a role that acts on death), they do nothing
+        if not self.alive and self.name_role not in ["Ravenkeeper"]:
+            return
+
+        match self.name_role: 
+            case "Poisoner": self.Act_Poisoner(game)
+            case "Spy": self.Act_Spy(game)
+            case "Baron": pass # Passive setup role, no night action
+            case "Scarlet Woman": self.Act_Scarlet_Woman(game)
+            case "Butler": self.Act_Butler(game)
+            case "Washerwoman": self.Act_Washerwoman(game)
+            case "Librarian": self.Act_Librarian(game)
+            case "Investigator": self.Act_Investigator(game)
+            case "Chef": self.Act_Chef(game)
+            case "Empath": self.Act_Empath(game)
+            case "Fortune Teller": self.Act_Fortune_Teller(game)
+            case "Undertaker": self.Act_Undertaker(game)
+            case "Monk": self.Act_Monk(game)
+            case "Ravenkeeper": self.Act_Ravenkeeper(game)
+            case "Imp": self.Act_Imp(game)
+            # Passive or Day roles - they don't wake up at night
+            case "Drunk" | "Recluse" | "Saint" | "Virgin" | "Slayer" | "Soldier" | "Mayor":
+                pass 
+
+    # --- ACTION IMPLEMENTATIONS ---
+    def Act_Poisoner(self, game: 'GameMgr'):
+        target_name = input(f"\nWake Poisoner ({self.name_player}). Who do they poison? ")
+        target = game.get_player_by_name(target_name)
+        if target:
+            target.poisoned = True
+        print("Put Poisoner to sleep.")
+
+    def Act_Monk(self, game: 'GameMgr'):
+        target_name = input(f"\nWake Monk ({self.name_player}). Who do they protect? ")
+        target = game.get_player_by_name(target_name)
+        if target:
+            target.protected = True
+        print("Put Monk to sleep.")
+
+    def Act_Spy(self, game: 'GameMgr'):
+        print(f"\nWake Spy ({self.name_player}). Show them the Grimoire. Put to sleep.")
+
+    def Act_Scarlet_Woman(self, game: 'GameMgr'):
+        imp = game.get_player_by_role("Imp")
+        alive_players = len([p for p in game.player_roles if p.alive])
+        if imp and not imp.alive and alive_players >= 5:
+            print(f"\n*** The Imp is dead. The Scarlet Woman ({self.name_player}) is now the Imp! ***")
+            self.name_role = "Imp"
+
+    def Act_Imp(self, game: 'GameMgr'):
+        target_name = input(f"\nWake Imp ({self.name_player}). Who do they kill? ")
+        target = game.get_player_by_name(target_name)
+        if target and not target.protected:
+            target.alive = False
+            game.killed_tonight = target # Save for Ravenkeeper check
+            print(f"{target.name_player} died.")
+        elif target and target.protected:
+            print(f"{target.name_player} was protected by the Monk and survives.")
+        print("Put Imp to sleep.")
+
+    def Act_Butler(self, game: 'GameMgr'):
+        target = input(f"\nWake Butler ({self.name_player}). Who is their Master? ")
+        print(f"Butler chose {target}. Put to sleep.")
+
+    def Act_Ravenkeeper(self, game: 'GameMgr'):
+        # Only wakes up if they were the specific person killed tonight
+        if game.killed_tonight == self:
+             print(f"\nWake Ravenkeeper ({self.name_player}). They died! Let them point to a player, show them the role. Put to sleep.")
+
+    # Generic Info Roles (Storyteller handles the exact info)
+    def Act_Washerwoman(self, game): print(f"\nWake Washerwoman ({self.name_player}). Show them 1 Townsfolk among 2 players. Put to sleep.")
+    def Act_Librarian(self, game): print(f"\nWake Librarian ({self.name_player}). Show them 1 Outsider among 2 players. Put to sleep.")
+    def Act_Investigator(self, game): print(f"\nWake Investigator ({self.name_player}). Show them 1 Minion among 2 players. Put to sleep.")
+    def Act_Chef(self, game): print(f"\nWake Chef ({self.name_player}). Show them pairs of evil players. Put to sleep.")
+    def Act_Empath(self, game): print(f"\nWake Empath ({self.name_player}). Show them evil neighbors count. Put to sleep.")
+    def Act_Fortune_Teller(self, game): print(f"\nWake Fortune Teller ({self.name_player}). Let them pick 2 players, nod if Demon. Put to sleep.")
+    def Act_Undertaker(self, game): print(f"\nWake Undertaker ({self.name_player}). Show them the role of today's executed player. Put to sleep.")
+
 
 class RoleDistributor:
-    # A class-level dictionary serves as a clean, readable lookup table
-    # Format: { num_players: (demons, outsiders, townsfolk, minions) }
     DISTRIBUTION_TABLE = {
-        5:  (1, 0, 3, 1),
-        6:  (1, 1, 3, 1),
-        7:  (1, 0, 5, 1),
-        8:  (1, 1, 5, 1),
-        9:  (1, 2, 5, 1),
-        10: (1, 0, 7, 2),
-        11: (1, 1, 7, 2),
-        12: (1, 2, 7, 2),
-        13: (1, 0, 9, 3),
-        14: (1, 1, 9, 3),
-        15: (1, 2, 9, 3),
+        5:  (1, 0, 3, 1), 6:  (1, 1, 3, 1), 7:  (1, 0, 5, 1), 8:  (1, 1, 5, 1),
+        9:  (1, 2, 5, 1), 10: (1, 0, 7, 2), 11: (1, 1, 7, 2), 12: (1, 2, 7, 2),
+        13: (1, 0, 9, 3), 14: (1, 1, 9, 3), 15: (1, 2, 9, 3),
     }
 
     def __init__(self, players: List[str]):
@@ -31,47 +104,20 @@ class RoleDistributor:
 
     def split_players(self):
         num_players = min(len(self.players), 15)
-        
         if num_players < 5: 
             raise ValueError("Sorry, numbers less than 5 are not allowed.")
-            
         return self.DISTRIBUTION_TABLE[num_players]
 
 
 class GameMgr:
-    ROLES_DEMONS: List[Dict[str, str]] = [
-        {"role": "Imp", "role_description": "Each night*, choose a player: they die. If you kill yourself this way, a Minion becomes the Imp."}
-    ]
-    
-    ROLES_MINIONS: List[Dict[str, str]] = [ 
-        {"role": "Poisoner", "role_description": "Each night, choose a player: they are poisoned tonight and tomorrow day."},
-        {"role": "Spy", "role_description": "Each night, you see the Grimoire. You might register as good & as a Townsfolk or Outsider, even if dead."},
-        {"role": "Baron", "role_description": "There are extra Outsiders in play. [+2 Outsiders]"},
-        {"role": "Scarlet Woman", "role_description": "If there are 5 or more players alive & the Demon dies, you become the Demon. (Travellers don't count.)"},
-    ]
-    
-    # FIXED: Renamed from ROLES_TOWNSFOLK to ROLES_OUTSIDERS
-    ROLES_OUTSIDERS: List[Dict[str, str]] = [
-        {"role": "Butler", "role_description": "Each night, choose a player (not yourself): tomorrow, you may only vote if they are voting too."},
-        {"role": "Drunk", "role_description": "You do not know you are the Drunk. You think you are a Townsfolk character, but you are not."},
-        {"role": "Recluse", "role_description": "You might register as evil & as a Minion or Demon, even if dead."},
-        {"role": "Saint", "role_description": "If you die by execution, your team loses."},
-    ]
-    
+    ROLES_DEMONS: List[Dict[str, str]] = [{"role": "Imp"}]
+    ROLES_MINIONS: List[Dict[str, str]] = [{"role": "Poisoner"}, {"role": "Spy"}, {"role": "Baron"}, {"role": "Scarlet Woman"}]
+    ROLES_OUTSIDERS: List[Dict[str, str]] = [{"role": "Butler"}, {"role": "Drunk"}, {"role": "Recluse"}, {"role": "Saint"}]
     ROLES_TOWNSFOLK: List[Dict[str, str]] = [
-        {"role": "Washerwoman", "role_description": "You start knowing that 1 of 2 players is a particular Townsfolk."},
-        {"role": "Librarian", "role_description": "You start knowing that 1 of 2 players is a particular Outsider. (Or that zero are in play.)"},
-        {"role": "Investigator", "role_description": "You start knowing that 1 of 2 players is a particular Minion."},
-        {"role": "Chef", "role_description": "You start knowing how many pairs of evil players there are."},
-        {"role": "Empath", "role_description": "Each night, you learn how many of your 2 alive neighbors are evil."},
-        {"role": "Fortune Teller", "role_description": "Each night, choose 2 players: you learn if either is a Demon. There is a good player that registers as a Demon to you."},
-        {"role": "Undertaker", "role_description": "Each night*, you learn which character died by execution today."},
-        {"role": "Monk", "role_description": "Each night*, choose a player (not yourself): they are safe from the Demon tonight."},
-        {"role": "Ravenkeeper", "role_description": "If you die at night, you are woken to choose a player: you learn their character."},
-        {"role": "Virgin", "role_description": "The 1st time you are nominated, if the nominator is a Townsfolk, they are executed immediately."},
-        {"role": "Slayer", "role_description": "Once per game, during the day, publicly choose a player: if they are the Demon, they die."},
-        {"role": "Soldier", "role_description": "You are safe from the Demon."},
-        {"role": "Mayor", "role_description": "If only 3 players live & no execution occurs, your team wins. If you die at night, another player might die instead."},
+        {"role": "Washerwoman"}, {"role": "Librarian"}, {"role": "Investigator"}, 
+        {"role": "Chef"}, {"role": "Empath"}, {"role": "Fortune Teller"}, 
+        {"role": "Undertaker"}, {"role": "Monk"}, {"role": "Ravenkeeper"}, 
+        {"role": "Virgin"}, {"role": "Slayer"}, {"role": "Soldier"}, {"role": "Mayor"}
     ]
 
     def __init__(self, players: List[str]):
@@ -79,56 +125,108 @@ class GameMgr:
         self.num_players = len(players)
         self.roles_distribution = RoleDistributor(self.players)
         self.player_roles: List[Role] = self.assign_roles()
+        self.turn_counter: int = 0
+        self.killed_tonight: Optional[Role] = None
 
     def assign_roles(self) -> List[Role]:
-        # Get the target counts from our distributor
-        d_count = self.roles_distribution.num_demons
-        o_count = self.roles_distribution.num_outsiders
-        t_count = self.roles_distribution.num_townsfolk
-        m_count = self.roles_distribution.num_minions
-
-        # random.sample guarantees we don't pick the same role twice
-        selected_demons = random.sample(self.ROLES_DEMONS, d_count)
-        selected_outsiders = random.sample(self.ROLES_OUTSIDERS, o_count)
-        selected_townsfolk = random.sample(self.ROLES_TOWNSFOLK, t_count)
-        selected_minions = random.sample(self.ROLES_MINIONS, m_count)
-
-        # Combine them into one "bag" of roles
-        all_selected_roles = (
-            selected_demons + 
-            selected_outsiders + 
-            selected_townsfolk + 
-            selected_minions
+        d_count, o_count, t_count, m_count = (
+            self.roles_distribution.num_demons, self.roles_distribution.num_outsiders,
+            self.roles_distribution.num_townsfolk, self.roles_distribution.num_minions
         )
+        selected_roles = (
+            random.sample(self.ROLES_DEMONS, d_count) + 
+            random.sample(self.ROLES_OUTSIDERS, o_count) + 
+            random.sample(self.ROLES_TOWNSFOLK, t_count) + 
+            random.sample(self.ROLES_MINIONS, m_count)
+        )
+        random.shuffle(selected_roles)
+        
+        assigned = []
+        for player, role_data in zip(self.players, selected_roles):
+            assigned.append(Role(player, role_data["role"]))
+        return assigned
 
-        # Shuffle the bag so player assignment is completely random
-        random.shuffle(all_selected_roles)
+    # --- HELPERS ---
+    def get_player_by_role(self, role_name: str) -> Optional[Role]:
+        for p in self.player_roles:
+            if p.name_role == role_name: return p
+        return None
 
-        # Pair up each player with a role from the shuffled bag
-        assigned_roles = []
-        for player, role_data in zip(self.players, all_selected_roles):
-            # Extract just the string name for the role instantiation
-            role_name = role_data["role"] 
-            print(f"Assigning {player} -> {role_name}")
+    def get_player_by_name(self, player_name: str) -> Optional[Role]:
+         for p in self.player_roles:
+             if p.name_player == player_name: return p
+         return None
+         
+    def wake_role(self, role_name: str):
+        """Helper to wake a specific role and run its action."""
+        player = self.get_player_by_role(role_name)
+        if player: player.TakeAction(self)
+
+    # --- NIGHT PHASES ---
+    def NightOne(self):
+        print("\n=== NIGHT 1 ===")
+        print("Everyone close your eyes. Put everyone to sleep.")
+
+        # 1 & 2. Demon/Minion Info
+        imp = self.get_player_by_role("Imp")
+        minions = [p for p in self.player_roles if p.name_role in [m["role"] for m in self.ROLES_MINIONS]]
+        
+        if imp and minions:
+            print(f"\nWake Minions ({', '.join([m.name_player for m in minions])}). Show them Imp is {imp.name_player}. Sleep.")
+            print(f"Wake Imp ({imp.name_player}). Show them Minions are {', '.join([m.name_player for m in minions])}.")
             
-            # Assuming the Role class expects a player name and a role name string
-            assigned_roles.append(Role(player, role_name))
+            in_play = [p.name_role for p in self.player_roles]
+            all_good = [r["role"] for r in self.ROLES_TOWNSFOLK + self.ROLES_OUTSIDERS]
+            bluffs = random.sample([r for r in all_good if r not in in_play], 3)
+            print(f"-> Show Imp these 3 bluffs: {', '.join(bluffs)}. Put to sleep.")
 
-        return assigned_roles
+        # 3 - 11. Iterate through the exact wake order using your Role actions
+        wake_order = [
+            "Poisoner", "Spy", "Washerwoman", "Librarian", "Investigator", 
+            "Chef", "Empath", "Fortune Teller", "Butler"
+        ]
+        for role in wake_order:
+            self.wake_role(role)
+
+        print("\n=== DAWN ===")
+        self.turn_counter += 1
+
+    def NightNext(self):
+        print(f"\n=== NIGHT {self.turn_counter + 1} ===")
+        self.killed_tonight = None # Reset
+        for p in self.player_roles:
+            p.poisoned = False
+            p.protected = False
+
+        # 1 - 3
+        self.wake_role("Poisoner")
+        self.wake_role("Monk")
+        self.wake_role("Spy")
+        
+        # 4 & 5
+        self.wake_role("Scarlet Woman") # Checks condition internally
+        self.wake_role("Imp")           # Does the kill
+        
+        # 6 - 10
+        wake_order = ["Ravenkeeper", "Undertaker", "Empath", "Fortune Teller", "Butler"]
+        for role in wake_order:
+            self.wake_role(role)
+
+        print("\n=== DAWN ===")
+        self.turn_counter += 1
 
 
 def main():
-    example = [
-        "1",
-        "2",
-        "3",
-        "4",
-        "5",
-        "6",
-        "7",
-    ]
+    example = ["Alice", "Bob", "Charlie", "David", "Eve", "Frank", "Grace"]
     game = GameMgr(example)
+    
+    print("--- ROLES ASSIGNED ---")
+    for player in game.player_roles:
+        print(f"{player.name_player}: {player.name_role}")
 
+    # Run a test loop
+    game.NightOne()
+    game.NightNext()
 
 if __name__ == "__main__":
     main()
