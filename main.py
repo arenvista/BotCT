@@ -1,12 +1,12 @@
 import random
 from typing import Dict, List, Optional, Tuple
 
-
 class GameMaster: 
     def __init__(self, player_name: str):
         self.player_name = player_name
     def modify_info(self, input_information: str):
         return
+
 class Role: 
     def __init__(self, name_player: str, name_role: str, believed_role: str|None = None, registered_role: str|None = None, registered_alignment: str|None = None):
         self.name_player: str  = name_player
@@ -140,7 +140,6 @@ class RoleDistributor:
             raise ValueError("Sorry, numbers less than 5 are not allowed.")
         return self.DISTRIBUTION_TABLE[num_players]
 
-
 class GameMgr:
     ROLES_DEMONS: List[Dict[str, str]] = [{"role": "Imp"}]
     ROLES_MINIONS: List[Dict[str, str]] = [{"role": "Poisoner"}, {"role": "Spy"}, {"role": "Baron"}, {"role": "Scarlet Woman"}]
@@ -239,7 +238,7 @@ class GameMgr:
              if p.name_player == player_name: return p
          return None
          
-    def wake_role(self, role_name: str):
+    def wake_role(self, role_name: str)-> None:
         for p in self.player_roles:
             if p.believed_role == role_name: 
                 p.TakeAction(self)
@@ -271,7 +270,7 @@ class GameMgr:
         print("\n=== DAWN ===")
         self.turn_counter += 1
 
-    def NightNext(self):
+    def NightNext(self) -> None:
         print(f"\n=== NIGHT {self.turn_counter + 1} ===")
         self.killed_tonight = None
         for p in self.player_roles:
@@ -291,7 +290,7 @@ class GameMgr:
         print("\n=== DAWN ===")
         self.turn_counter += 1
 
-    def print_board(self):
+    def print_board(self) -> None:
         """Prints the current state of the board (The Grimoire) for the Storyteller."""
         print("\n" + "="*55)
         print(f"=== GRIMOIRE (STORYTELLER VIEW) - Turn {self.turn_counter} ===")
