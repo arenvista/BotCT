@@ -28,39 +28,31 @@ Supports **5–15 players** using a distribution table:
 ### Implemented Mechanics
 
 * **Drunk**
-
   * Assigned a fake Townsfolk role via `believed_role`
   * Acts as if they are that role
 
 * **Spy**
-
   * Can *misregister* as a random Good role/alignment
   * Has access to the full board state
 
 * **Poisoner**
-
   * Poisons one player per night (resets nightly)
 
 * **Monk**
-
   * Protects one player per night (resets nightly)
 
 * **Imp**
-
   * Selects a player to kill
   * Protected players survive
 
 * **Scarlet Woman**
-
   * Becomes the Imp if the Imp dies and **5+ players remain**
 
 * **Empath**
-
   * Automatically counts Evil neighbors
   * Returns incorrect info if **poisoned** or actually the **Drunk**
 
 * **Grimoire Output**
-
   * `GameMgr.print_board()` shows full Storyteller view
 
 ---
