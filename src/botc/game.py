@@ -48,9 +48,15 @@ class GameManager:
         )
 
         chosen_demons = random.sample(self.ROLES_DEMONS, d_count)
+        chosen_minions = random.sample(self.ROLES_MINIONS, m_count)
+
+        if RoleName.BARON in chosen_minions:
+            BARON_OUTSIDER_OFFSET = 3
+            o_count += BARON_OUTSIDER_OFFSET
+            t_count -= BARON_OUTSIDER_OFFSET
+
         chosen_outsiders = random.sample(self.ROLES_OUTSIDERS, o_count)
         chosen_townsfolk = random.sample(self.ROLES_TOWNSFOLK, t_count)
-        chosen_minions = random.sample(self.ROLES_MINIONS, m_count)
 
         selected_roles = chosen_demons + chosen_outsiders + chosen_townsfolk + chosen_minions
 
