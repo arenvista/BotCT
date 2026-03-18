@@ -10,6 +10,8 @@ class Alignment(Enum):
         return self.name.title()
 
 class RoleClass(Enum):
+    NULL = -1
+    GAMEMASTER = 0
     DEMONS = 1
     MINIONS = 2
     OUTSIDERS = 3
@@ -29,6 +31,9 @@ class RoleName(Enum):
         obj._value_ = value
         obj.role_class = role_class
         return obj
+
+    # GameMaster/Storyteller
+    GAMEMASTER = (0, RoleClass.GAMEMASTER)
 
     # Minions
     POISONER = (1, RoleClass.MINIONS)

@@ -1,4 +1,10 @@
 # src/botc/behaviors/minions.py
+from __future__ import annotations      
+from typing import TYPE_CHECKING         
+if TYPE_CHECKING:                        
+    from botc.player import Player
+    from botc.game import GameManager
+
 from botc.enums import RoleName, Alignment
 from .base import RoleBehavior
 from . import register_role, BEHAVIOR_MAP

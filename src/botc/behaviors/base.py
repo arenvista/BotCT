@@ -14,6 +14,7 @@ if TYPE_CHECKING:
 class RoleBehavior(ABC):
     first_night_priority: Optional[int] = None
     other_night_priority: Optional[int] = None
+    is_reliable: bool = True # Determine reliablity of information if poisioned/drunk
 
     @abstractmethod
     def act(self, player: Player, game: GameManager) -> None:
