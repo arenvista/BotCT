@@ -61,13 +61,17 @@ Legend:
 ```
 
 ### Core Systems
+* [-] Finish Behaviors
+    - [ ] Fortune Teller
+    - [ ] Slayer
+    - [ ] Other shit im too lazy to find
 * [ ] Game Master interface for overriding info (poison/drunk corrections)
-* [ ] Persistent game state (save/load)
-  * [ ] Editable raw state file
-  * [ ] Reload game from file
 * [ ] Separate logs:
   * [ ] Storyteller view
   * [ ] Player-facing info
+* [ ] Persistent game state (save/load)
+  * [ ] Editable raw state file
+  * [ ] Reload game from file
 
 ### Gameplay
 * [ ] Day phase (discussion → nominations → execution)

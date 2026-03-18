@@ -53,6 +53,7 @@ class LibrarianBehavior(RoleBehavior):
             selected_players = random.sample([p_other.player_name for p_other in game.players if p_other != player], 2)
             role_to_reveal = random.sample(ROLES_OUTSIDERS, 1)[0].display_name
         message = "One of " + ",".join(selected_players) + " is a " + role_to_reveal
+        #TODO: log output 
 
 @register_role(RoleName.INVESTIGATOR)
 class InvestigatorBehavior(RoleBehavior):
