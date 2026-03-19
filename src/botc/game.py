@@ -1,9 +1,10 @@
 # src/botc/game.py
+import json
 import random
 from typing import List, Optional, Tuple
-
 from botc.enums import Alignment, RoleClass, RoleName
 from botc.player import Player
+from botc.utils import GameIO
 
 class GameMaster: 
     def __init__(self, player_name: str):
@@ -40,6 +41,7 @@ class GameManager:
         self.turn_counter: int = 0
         self.killed_tonight: Optional[Player] = None
         self.game_master: GameMaster = GameMaster("GM")
+        self.gameio: GameIO = GameIO()
 
     def assign_roles(self) -> List[Player]:
         d_count, o_count, t_count, m_count = (
@@ -182,3 +184,4 @@ class GameManager:
 
             print(f"Seat {i+1:02d} | {player.player_name:<8} | {status:<5} | {role_info}{poison_str}{protect_str}")
         print("="*55 + "\n")
+        self.gameio.export_players_to_json(self.players, "game_state.json")

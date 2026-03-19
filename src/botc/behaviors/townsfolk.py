@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, List
 if TYPE_CHECKING:                        
     from botc.player import Player
     from botc.game import GameManager
-    # from botc.selectors.selector import Selector
+    from botc.utils.game_io import GameIO
 
 import random
 from botc.enums import RoleName, Alignment, RoleClass
@@ -19,7 +19,6 @@ ROLES_TOWNSFOLK = RoleName.get_by_class(RoleClass.TOWNSFOLK)
 @register_role(RoleName.WASHERWOMAN)
 class WasherwomanBehavior(RoleBehavior):
     first_night_priority = 3
-
     def act(self, player: Player, game: GameManager):
         is_reliable: bool = player.actual_role == RoleName.DRUNK or player.poisoned
         selected_players: List[str] = []
@@ -99,8 +98,15 @@ class FortuneTellerBehavior(RoleBehavior):
     first_night_priority = 8
     other_night_priority = 9
     def act(self, player: Player, game: GameManager):
-        print(f"\nWake {player.believed_role} ({player.player_name}). Let them pick 2 players, nod if Demon. Put to sleep.")
-        # TODO: Implement FortuneTellerBehavior
+        possible_selections: List[Player] = [p for p in game.players if p.alive == True and p != player]
+        selected_player_names: List[str] = []
+        selected_player_names.append(game.selector.get_user_choice([p.player_name for p in possible_selections], "Select First Player to Divine"))
+        selected_player_names.append(game.selector.get_user_choice([p.player_name for p in possible_selections], "Select Second Player to Divine"))
+        selected_players = [p for p in possible_selections if p.player_name in selected_player_names]
+        for p in selected_players:
+            if p.believed_role == RoleName.IMP:
+                print("There is an Imp among us")
+        print("All is good in the world, no Imps here.")
 
 @register_role(RoleName.MONK)
 class MonkBehavior(RoleBehavior):

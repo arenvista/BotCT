@@ -1,4 +1,3 @@
-# src/botc/player.py
 from __future__ import annotations
 from typing import TYPE_CHECKING
 
@@ -14,15 +13,12 @@ class Player:
     def __init__(self, player_name: str, actual_role: RoleName, believed_role: RoleName | None = None, registered_role: RoleName | None = None, registered_alignment: Alignment | None = None):
         self.player_name: str = player_name
         self.actual_role: RoleName = actual_role
-
         self.believed_role: RoleName = believed_role if believed_role else actual_role
         self.registered_role: RoleName = registered_role if registered_role else actual_role
         self.registered_alignment: Alignment = registered_alignment if registered_alignment else self._default_alignment()
-
         self.alive: bool = True
         self.poisoned: bool = False
         self.protected: bool = False
-
         self.role_behavior: RoleBehavior = BEHAVIOR_MAP.get(self.believed_role, PassiveBehavior())
 
     def _default_alignment(self) -> Alignment:
@@ -34,3 +30,14 @@ class Player:
         if not self.alive and self.believed_role != RoleName.RAVENKEEPER:
             return
         self.role_behavior.act(self, game)
+
+    def _to_dict(self) -> dict:
+        return {
+            "actual_role": self.actual_role.name, 
+            "believed_role": self.believed_role.name,
+            "registered_role": self.registered_role.name,
+            "registered_alignment": self.registered_alignment.name,
+            "alive": self.alive,
+            "poisoned": self.poisoned,
+            "protected": self.protected
+        }

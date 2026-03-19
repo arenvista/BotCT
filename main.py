@@ -24,6 +24,7 @@ def main():
     game.print_board()
     game.night_next()
     game.print_board()
+    game.export_players_to_json()
 
 if __name__ == "__main__":
     main()
