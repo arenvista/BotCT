@@ -100,8 +100,8 @@ class FortuneTellerBehavior(RoleBehavior):
     def act(self, player: Player, game: GameManager):
         possible_selections: List[Player] = [p for p in game.players if p.alive == True and p != player]
         selected_player_names: List[str] = []
-        selected_player_names.append(game.selector.get_user_choice([p.player_name for p in possible_selections], "Select First Player to Divine"))
-        selected_player_names.append(game.selector.get_user_choice([p.player_name for p in possible_selections], "Select Second Player to Divine"))
+        selected_player_names.append(game.gameio.get_user_choice([p.player_name for p in possible_selections], "Select First Player to Divine"))
+        selected_player_names.append(game.gameio.get_user_choice([p.player_name for p in possible_selections], "Select Second Player to Divine"))
         selected_players = [p for p in possible_selections if p.player_name in selected_player_names]
         for p in selected_players:
             if p.believed_role == RoleName.IMP:
@@ -122,7 +122,7 @@ class MonkBehavior(RoleBehavior):
 class RavenkeeperBehavior(RoleBehavior):
     other_night_priority = 6
     def act(self, player: Player, game: GameManager) -> None:
-        if game.killed_tonight == player:
+        if game.killed_tonight == player and player.registered_role == RoleName.RAVENKEEPER:
             print(f"\nWake {player.believed_role} ({player.player_name}). They died! Let them point to a player, show them the role. Put to sleep.")
             # TODO: Implement RavenkeeperBehavior
 

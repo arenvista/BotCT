@@ -15,10 +15,56 @@ intents.members = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-
 @bot.event
 async def on_ready():
     print(f"We are ready to go in, {bot.user.name}")
+
+@bot.command(name="create_private")
+@commands.has_permissions(manage_roles=True)
+async def create_private_channel(ctx, category: discord.CategoryChannel, channel_name: str, members: commands.Greedy[discord.Member]):
+    """
+    Creates a private text channel under a specific category.
+    Usage: !create_private "Category Name" "channel-name" @user1 @user2
+    """
+    
+    # 1. Base Permissions (Hide from everyone, keep bot access)
+    overwrites = {
+        ctx.guild.default_role: discord.PermissionOverwrite(view_channel=False),
+        ctx.guild.me: discord.PermissionOverwrite(view_channel=True)
+    }
+
+    # 2. Add specific members to the permissions list
+    if not members:
+        await ctx.send("⚠️ You need to mention at least one member!")
+        return
+
+    for member in members:
+        overwrites[member] = discord.PermissionOverwrite(view_channel=True)
+
+    # 3. Create the channel IN THE SPECIFIC CATEGORY
+    try:
+        new_channel = await ctx.guild.create_text_channel(
+            name=channel_name,
+            category=category,  # <-- This tells Discord where to put the channel
+            overwrites=overwrites,
+            reason=f"Private channel created by {ctx.author}"
+        )
+        
+        member_names = ", ".join([m.display_name for m in members])
+        await ctx.send(f"✅ Created {new_channel.mention} under the **{category.name}** category for: **{member_names}**")
+
+    except discord.Forbidden:
+        await ctx.send("❌ I don't have the required permissions to do this.")
+    except discord.HTTPException:
+        await ctx.send("❌ Something went wrong communicating with Discord.")
+
+# Error handling specifically if the bot can't find the category
+@create_private_channel.error
+async def create_private_error(ctx, error):
+    if isinstance(error, commands.MissingPermissions):
+        await ctx.send("⛔ You need the `Manage Roles` permission to use this command.")
+    elif isinstance(error, commands.ChannelNotFound):
+        await ctx.send("❌ I couldn't find a category with that name. Check your spelling and try again!")
 
 @bot.command()
 @commands.has_permissions(manage_roles=True)
@@ -68,22 +114,3 @@ async def assign(ctx, team_number: int, members: commands.Greedy[discord.Member]
         await ctx.send("⚠️ No members were updated. Check my role position in Server Settings!")
 
 bot.run(token, log_handler=handler, log_level=logging.DEBUG)
-# ----
-# intents = discord.Intents.default()
-# intents.message_content = True
-#
-# client = discord.Client(intents=intents)
-#
-# @client.event
-# async def on_ready():
-#     print(f'We have logged in as {client.user}')
-#
-# @client.event
-# async def on_message(message):
-#     if message.author == client.user:
-#         return
-#
-#     if message.content.startswith('$hello'):
-#         await message.channel.send('Hello!')
-#
-# client.run('your token here')

@@ -1,5 +1,41 @@
 {
     "Alice": {
+        "actual_role": "WASHERWOMAN",
+        "believed_role": "WASHERWOMAN",
+        "registered_role": "WASHERWOMAN",
+        "registered_alignment": "GOOD",
+        "alive": true,
+        "poisoned": false,
+        "protected": false
+    },
+    "Bob": {
+        "actual_role": "BARON",
+        "believed_role": "BARON",
+        "registered_role": "BARON",
+        "registered_alignment": "EVIL",
+        "alive": true,
+        "poisoned": false,
+        "protected": false
+    },
+    "Charlie": {
+        "actual_role": "SAINT",
+        "believed_role": "SAINT",
+        "registered_role": "SAINT",
+        "registered_alignment": "GOOD",
+        "alive": true,
+        "poisoned": false,
+        "protected": false
+    },
+    "David": {
+        "actual_role": "DRUNK",
+        "believed_role": "LIBRARIAN",
+        "registered_role": "DRUNK",
+        "registered_alignment": "GOOD",
+        "alive": true,
+        "poisoned": false,
+        "protected": false
+    },
+    "Eve": {
         "actual_role": "IMP",
         "believed_role": "IMP",
         "registered_role": "IMP",
@@ -8,46 +44,10 @@
         "poisoned": false,
         "protected": false
     },
-    "Bob": {
-        "actual_role": "RAVENKEEPER",
-        "believed_role": "RAVENKEEPER",
-        "registered_role": "RAVENKEEPER",
-        "registered_alignment": "GOOD",
-        "alive": true,
-        "poisoned": false,
-        "protected": false
-    },
-    "Charlie": {
-        "actual_role": "POISONER",
-        "believed_role": "POISONER",
-        "registered_role": "POISONER",
-        "registered_alignment": "EVIL",
-        "alive": true,
-        "poisoned": false,
-        "protected": false
-    },
-    "David": {
-        "actual_role": "EMPATH",
-        "believed_role": "EMPATH",
-        "registered_role": "EMPATH",
-        "registered_alignment": "GOOD",
-        "alive": true,
-        "poisoned": false,
-        "protected": false
-    },
-    "Eve": {
+    "Frank": {
         "actual_role": "RECLUSE",
         "believed_role": "RECLUSE",
         "registered_role": "RECLUSE",
-        "registered_alignment": "GOOD",
-        "alive": true,
-        "poisoned": true,
-        "protected": false
-    },
-    "Frank": {
-        "actual_role": "INVESTIGATOR",
-        "believed_role": "INVESTIGATOR",
-        "registered_role": "INVESTIGATOR",
         "registered_alignment": "GOOD",
         "alive": true,
         "poisoned": false,
@@ -63,9 +63,9 @@
         "protected": false
     },
     "Henry": {
-        "actual_role": "VIRGIN",
-        "believed_role": "VIRGIN",
-        "registered_role": "VIRGIN",
+        "actual_role": "BUTLER",
+        "believed_role": "BUTLER",
+        "registered_role": "BUTLER",
         "registered_alignment": "GOOD",
         "alive": true,
         "poisoned": false,

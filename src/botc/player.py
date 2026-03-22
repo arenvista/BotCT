@@ -41,3 +41,9 @@ class Player:
             "poisoned": self.poisoned,
             "protected": self.protected
         }
+
+    def propose_candidate(self, game: GameManager):
+        potential_candidates = [player for player in game.players if player.alive == True]
+        selection = ""
+        if selection:
+            game.vote_table[self.player_name][selection] += 1

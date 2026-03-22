@@ -21,10 +21,9 @@ def main():
             print(f"{prefix}: {player.actual_role} (Alignment: {player.registered_alignment})")
             
     game.night_one()
-    game.print_board()
-    game.night_next()
-    game.print_board()
-    game.export_players_to_json()
+    # game.print_board()
+    # game.night_next()
+    # game.print_board()
 
 if __name__ == "__main__":
     main()

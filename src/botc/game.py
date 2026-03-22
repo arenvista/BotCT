@@ -42,6 +42,14 @@ class GameManager:
         self.killed_tonight: Optional[Player] = None
         self.game_master: GameMaster = GameMaster("GM")
         self.gameio: GameIO = GameIO()
+        self.executed_player: str = ""
+        self.vote_table: dict[str, dict[str,int]] = {}
+        self._ini_vote_table()
+
+    def _ini_vote_table(self):
+        self.vote_table: dict[str, dict[str,int]] = {}
+        for p_name_i in self.player_names:
+            self.vote_table[p_name_i] = {p_name_j:0 for p_name_j in self.player_names}
 
     def assign_roles(self) -> List[Player]:
         d_count, o_count, t_count, m_count = (
@@ -114,8 +122,9 @@ class GameManager:
             if p.actual_role == target_role: return p
         return None
 
-    def get_player_by_name(self) -> Player:
-        player_name = input("Select Target: ")
+    def get_player_by_name(self, player_name="") -> Player:
+        if player_name == "":
+            player_name = input("Select Target: ")
         for p in self.players:
             if p.player_name == player_name: return p
         raise ValueError(f"Player {player_name}")
@@ -164,6 +173,25 @@ class GameManager:
 
         print("\n=== DAWN ===")
         self.turn_counter += 1
+
+    def day(self) -> None:
+        # show all players the possible people to vote on 
+        # if they can vote let them vote
+        # tally scores see if any exceede 50%
+        ## Vote Logic --------------------
+        flat_votes: dict[str,int] = {k: v for inner_dict in self.vote_table.values() for k, v in inner_dict.items()}
+        vote_total = -1
+        for candidate, vote_count in flat_votes.items():
+            vote_total += vote_count
+        vote_percentages = [vote_count/vote_total for candidate, vote_count in flat_votes.items()]
+        paired_scores = zip(flat_votes.keys(), vote_percentages)
+        for score in paired_scores:
+            candidate = score[0]
+            vote_percentage = score[1]
+            if vote_percentage > 0.5:
+                self.get_player_by_name(candidate).alive = False
+                self.executed_player = candidate
+        return 
 
     def print_board(self) -> None:
         print("\n" + "="*55)
