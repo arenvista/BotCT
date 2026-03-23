@@ -79,12 +79,13 @@ Legend:
 * [ ] Win conditions (e.g., Good wins if Demon dies)
 
 ### Roles & Logic
-* [ ] Chef implementation
-* [ ] Washerwoman / Librarian / Investigator token logic
+* [-] Chef implementation
+* [-] Washerwoman / Librarian / Investigator token logic
 * [ ] Recluse misregistration
 * [ ] Full poison/drunk interaction system
 * [ ] Special abilities:
   * Recluse, Saint, Virgin, Slayer, Soldier, Mayor
+* [ ] Getting fake info from Game Master
 
 ---
 
