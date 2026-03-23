@@ -78,6 +78,41 @@ class ChefBehavior(RoleBehavior):
         print(f"\nWake {player.believed_role} ({player.player_name}). Show them pairs of evil players. Put to sleep.")
         # TODO: Implement Logic
 
+        is_reliable: bool = not (player.actual_role == RoleName.DRUNK or player.poisoned)
+
+        if is_reliable: # not drunk or poisoned
+            # TODO: Needs testing. Have not tested [E, G, G, G, G, G, E] or [G, G, G, E, E, E, G, G,]
+            
+            # assuming that game.players (List) has people in order in which they're seated
+            seated_order: List[Player] = game.players
+            n: int = game.num_players
+            pairs: int = 0
+
+            for i in range(n):
+                #check if player is evil
+                if seated_order[i].registered_alignment == Alignment.EVIL:
+                    # check if person to right is evil
+                    if i < n - 1:
+                        if seated_order[i + 1].registered_alignment == Alignment.EVIL:
+                            pairs += 1
+
+                    # manually check last person in array
+                    elif i == n - 1:
+                        # check to see if person at index 0 is GOOD or EVIl
+                        if seated_order[0].registered_alignment == Alignment.EVIL:
+                            pairs += 1
+            print(f'Tell {player.player_name} that there are {pairs} pairs')
+
+        else: # either drunk or posioned so give random number from 0-2 depending on distribution of players
+            num_evil = game.roles_distribution.num_demons + game.roles_distribution.num_minions
+            if num_evil == 1:
+                print(f'Tell {player.player_name} that there are 0 pairs')
+            elif num_evil == 2:
+                print(f'Tell {player.player_name} that there are {random.randint(0,1)} pairs') 
+            else:
+                print(f'Tell {player.player_name} that there are {random.randint(0,2)} pairs') 
+
+
 @register_role(RoleName.EMPATH)
 class EmpathBehavior(RoleBehavior):
     first_night_priority = 7
@@ -107,6 +142,39 @@ class FortuneTellerBehavior(RoleBehavior):
             if p.believed_role == RoleName.IMP:
                 print("There is an Imp among us")
         print("All is good in the world, no Imps here.")
+@register_role(RoleName.UNDERTAKER)
+class UndertakerBehavior(RoleBehavior):
+    other_night_priority = 7
+    def act(self, player: Player, game: GameManager):
+        #print(f"\nWake {player.believed_role} ({player.player_name}). Show them the role of todays executed player. Put to sleep.")
+        # TODO: Implement UndertakerBehavior
+        # TODO: Print statements need to be updated. Display class than name in some cases.
+
+        if not game.executed_player:
+            print(f"No player has been executed, Undertaker does nothing")
+
+        is_reliable: bool = not (player.actual_role == RoleName.DRUNK or player.poisoned) # added not since we want is_reliable to be true when player is not Drunk OR is not Poisoned
+        executed_player: Player = game.get_player_by_name(game.executed_player)
+
+        if is_reliable: # not drunk or poisoned
+            if executed_player.actual_role == RoleName.DRUNK:
+                # TODO: English hard. Idk if this sentence makes sense. Should we assume players are playing in person or online. DIADJSAdaosdk
+                print(f"Wake up {player.player_name} and tell them {executed_player.player_name} was a Drunk (or show them the Drunk Token).")
+            else:
+                print(f"Wake up {player.player_name} and tell them {executed_player.player_name} was a {executed_player.actual_role} (or show them the {executed_player.actual_role} Token).")
+        else:
+
+            # TODO: Check this out. Not sure how to give false information
+            role = ""
+            message = f"Wake up {player.believed_role}({player.player_name}) and tell them {executed_player.player_name} was a {role} (or show them the {role} Token)."
+
+            # for the miss information, pick random role? 
+            # can't pick role since information is dependent on game context. Giving a random role might fk over game
+            # have the Game Manager pick role
+            role = input(f"Give false information to {player.believed_role}({player.player_name}). What false role do you want to tell them?\n False Role: ")
+            
+            print(message)
+
 
 @register_role(RoleName.MONK)
 class MonkBehavior(RoleBehavior):
@@ -122,13 +190,117 @@ class MonkBehavior(RoleBehavior):
 class RavenkeeperBehavior(RoleBehavior):
     other_night_priority = 6
     def act(self, player: Player, game: GameManager) -> None:
-        if game.killed_tonight == player and player.registered_role == RoleName.RAVENKEEPER:
-            print(f"\nWake {player.believed_role} ({player.player_name}). They died! Let them point to a player, show them the role. Put to sleep.")
+            
+        # drunk can be ravenkeeper but has fake info
+        #if game.killed_tonight == player and player.registered_role == RoleName.RAVENKEEPER:
+        #    print(f"\nWake {player.believed_role} ({player.player_name}). They died! Let them point to a player, show them the role. Put to sleep.")
             # TODO: Implement RavenkeeperBehavior
 
-@register_role(RoleName.UNDERTAKER)
-class UndertakerBehavior(RoleBehavior):
-    other_night_priority = 7
-    def act(self, player: Player, game: GameManager):
-        print(f"\nWake {player.believed_role} ({player.player_name}). Show them the role of todays executed player. Put to sleep.")
-        # TODO: Implement UndertakerBehavior
+        # I FUCKING HATE THESE NEST IF STATEMENTS
+        # but I want to deal with the case where a player is both drunk and poisoned. In this case, the Game Master needs to give information that really fucks the good side.
+
+        random_float = random.random() # float from 0.0 - 1.0
+
+
+        if player.actual_role == RoleName.DRUNK: 
+            if player.poisoned: 
+                print(f"\n{player.believed_role} ({player.player_name}) has died! {player.player_name} is a Drunk and is Poisoned.\n Let them point to a player and give them information that screws the Good team. \nPut them to sleep.")
+            elif random_float <= 0.2: 
+                print(f"\nWake {player.believed_role} ({player.player_name}). They died! Since {player.player_name} is a Drunk and got LUCKY, let them point to a player and show them the right role. Put them to sleep.")
+            else: 
+                print(f"\nWake {player.believed_role} ({player.player_name}). They died! Since {player.player_name} is a Drunk, let them point to a player and show them the wrong role. Put them to sleep.")
+
+        
+        if player.believed_role == RoleName.RAVENKEEPER: # Drunk case, player thinks their a Ravenkeeper
+            print(f"\n{player.believed_role} ({player.player_name}) has died!")
+            picked_player = input(f"Wake up {player.believed_role} ({player.player_name}) and have them point to another player. \n Who did they pick? ")
+
+
+
+@register_role(RoleName.VIRGIN)
+class VirginBehavior(RoleBehavior):
+    def act(self, player: Player, game: GameManager) -> None:
+        # TODO: Implement Virgin
+        # only need to check if not drunk or poisoned and if nominator is aa townfolk
+        
+        is_reliable: bool = not (player.actual_role == RoleName.DRUNK or player.poisoned)
+        nominator: Player =  game.get_player_by_name(game.nominator)
+
+        if is_reliable:
+            if nominator.actual_role in ROLES_TOWNSFOLK:
+                nominator.alive = False
+                print(f"{nominator.believed_role}({nominator.player_name}) has died.") 
+
+        # dont need to check drunk or poisoned since they will die either way during the vote (if majority voted to execute)
+
+@register_role(RoleName.SLAYER)
+class SlayerBehavior(RoleBehavior):
+    def act(self, player: Player, game: GameManager) -> None:
+        # TODO: Implement Slayer
+
+        is_reliable: bool = not (player.actual_role == RoleName.DRUNK or player.poisoned)
+
+        if is_reliable:
+            print(f"\nWake {player.believed_role}({player.player_name}) up.")
+            target: Player = game.get_player_by_name()
+            if target.actual_role == RoleName.IMP:
+                target.alive = False
+                print(f"\n {player.believed_role}({player.player_name}) has killed the Imp!")
+            else: 
+                print(f"{player.believed_role}({player.player_name}) has targeted someone who is not the Imp, nothing happens")
+
+        # ignore drunk or poison case since nothing would happen either way.
+        else:
+            if player.actual_role == RoleName.DRUNK:
+                print(f"\nSince {player.believed_role}({player.player_name}) is actually a Drunk, Nothing happens.")
+            else:
+                print(f"\nSince {player.believed_role}({player.player_name}) is poisoned, Nothing happens.")
+
+
+
+@register_role(RoleName.SOLDIER)
+class SoldierBehavior(RoleBehavior):
+    first_night_priority = 100 # not sure what to set this as
+    other_night_priority = 100 # not sure what to set this as
+    def act(self, player: Player, game: GameManager) -> None:
+        # TODO: Implement Soldier
+        
+        is_reliable: bool = not (player.actual_role == RoleName.DRUNK or player.poisoned)
+
+        if is_reliable:
+            player.protected = True
+        else: # if Drunk, they are not protected. If poisoned, they are not protected from Imp's Attack
+            player.protected = False
+
+@register_role(RoleName.MAYOR)
+class MayorBehavior(RoleBehavior):
+    def act(self, player: Player, game: GameManager) -> None:
+        # TODO: Implement Mayor
+        
+
+        if game.num_players_remaining != 3:
+            return
+
+        if game.executed_player:
+            print("There has been an execution, Mayor's ability does not work.")
+            return
+
+        is_reliable: bool = not (player.actual_role == RoleName.DRUNK or player.poisoned)
+
+        if is_reliable:
+            game.game_over = True
+            print(f"3 players are remaining and no Execution has occurred. Good Wins due to Mayor's ability")
+        else:
+            if player.actual_role == RoleName.DRUNK:
+                print(f"3 players are remaining and no Execution has occurred. But Mayor is DRUNK! Nothing happens")
+            if player.poisoned:
+                print(f"3 players are remaining and no Execution has occurred. But Mayor is POISONED! Mayor's ability does not work!")
+        
+
+
+# NOTE
+# how to deal with fake info????
+# How do you figure out night priorities????????
+# dont want to take power away from Game Master. Let them pick misinformation and have impact on game
+
+# Need to clear game.executed_player at the beginning of next round

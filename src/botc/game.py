@@ -40,19 +40,20 @@ class GameManager:
 
     def __init__(self, player_names: List[str]):
         self.player_names = player_names
-        self.num_players = len(player_names)
         self.roles_distribution = RoleDistributor(self.player_names)
         self.players: List[Player] = self.assign_roles()
-        self.players_alive = self.players
+        self.players_alive: List[Player] = self.players
         self.turn_counter: int = 0
         self.killed_tonight: Optional[Player] = None
         self.game_master: GameMaster = GameMaster("GM")
         self.gameio: GameIO = GameIO()
         self.executed_player: str = ""
+
+        self.nominator: str = "" # variable to track who started vote
+        
         self.vote_table: dict[str, dict[str,int]] = {}
         self._ini_vote_table()
-        self.game_over = False
-
+        self.game_over: bool = False
 
     def _ini_vote_table(self):
         self.vote_table: dict[str, dict[str,int]] = {}
@@ -187,6 +188,8 @@ class GameManager:
         # if they can vote let them vote
         # tally scores see if any exceede 50%
         ## Vote Logic --------------------
+        self.executed_player = ""
+        self._ini_vote_table()
         flat_votes: dict[str,int] = {k: v for inner_dict in self.vote_table.values() for k, v in inner_dict.items()}
         vote_total = -1
         for candidate, vote_count in flat_votes.items():
