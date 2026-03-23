@@ -13,10 +13,6 @@ from botc.player import Player
 from botc.utils import GameIO
 from botc.botmgr import BotMgr, TeamManagement, PollManager
 
-class GameMaster: 
-    def __init__(self, player_name: str):
-        self.player_name = player_name
-
 class RoleDistributor:
     DISTRIBUTION_TABLE = {
         5:  (1, 0, 3, 1), 6:  (1, 1, 3, 1), 7:  (1, 0, 5, 1), 8:  (1, 1, 5, 1),
@@ -41,7 +37,6 @@ class GameManager:
     ROLES_TOWNSFOLK = RoleName.get_by_class(RoleClass.TOWNSFOLK)
 
     def __init__(self, player_names: List[str]):
-        self.current_players = []
         self.player_names = player_names
         
         # Safe initialization check
@@ -55,7 +50,7 @@ class GameManager:
             
         self.turn_counter: int = 0
         self.killed_tonight: Optional[Player] = None
-        self.game_master: GameMaster = GameMaster("GM")
+        self.game_master: str = ""
         self.gameio: GameIO = GameIO()
         self.executed_player: str = ""
         self.nominator: str = ""
@@ -67,9 +62,17 @@ class GameManager:
         load_dotenv()
         self.token = str(os.getenv("DISCORD_TOKEN"))
         self.bot = BotMgr(self)
-        self.poll_manager = PollManager(self.bot)
+        self.poll_manager = PollManager(self)
+        self.team_manager = TeamManagement(self.bot,self)
 
-    def _start_game(self):
+    async def message_roles(self):
+        for player in self.players:
+            await self.team_manager.send_message(player.player_name, player.show_role())
+        return 
+
+    async def _start_game(self):
+        # Starts from call within bot.py
+        await self.message_roles()
 
     def _ini_vote_table(self):
         self.vote_table: dict[str, dict[str,int]] = {}
@@ -108,7 +111,7 @@ class GameManager:
 
         random.shuffle(selected_roles)
 
-        assigned = []
+        assigned: List[Player] = []
         for player_name, role_enum in zip(self.player_names, selected_roles):
             believed_role = None
             registered_role = None

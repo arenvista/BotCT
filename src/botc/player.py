@@ -21,6 +21,10 @@ class Player:
         self.protected: bool = False
         self.role_behavior: RoleBehavior = BEHAVIOR_MAP.get(self.believed_role, PassiveBehavior())
 
+    def show_role(self):
+        output = f"""Hi {self.player_name}, you are the {self.believed_role}"""
+        return output
+
     def _default_alignment(self) -> Alignment:
         if self.actual_role.role_class in (RoleClass.DEMONS, RoleClass.MINIONS):
             return Alignment.EVIL

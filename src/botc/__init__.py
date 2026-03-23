@@ -7,7 +7,7 @@ Blood on the Clocktower (botc) core engine package.
 # so they can be imported directly from 'botc'.
 from .enums import Alignment, RoleClass, RoleName
 from .player import Player
-from .game import GameManager, GameMaster
+from .game import GameManager
 from .utils import GameIO
 
 # __all__ restricts what gets imported if someone uses `from botc import *`
@@ -17,5 +17,4 @@ __all__ = [
     "RoleName",
     "Player",
     "GameManager",
-    "GameMaster",
 ]
