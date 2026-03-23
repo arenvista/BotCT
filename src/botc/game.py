@@ -1,15 +1,17 @@
 # src/botc/game.py
 import json
 import random
+import os
+import logging
 from typing import List, Optional, Tuple
+from time import sleep
+import discord
+from dotenv import load_dotenv
+
 from botc.enums import Alignment, RoleClass, RoleName
 from botc.player import Player
 from botc.utils import GameIO
-from botc.botmgr import BotMgr, TeamManagement
-from time import sleep
-import logging
-from dotenv import load_dotenv
-import os 
+from botc.botmgr import BotMgr, TeamManagement, PollManager
 
 class GameMaster: 
     def __init__(self, player_name: str):
@@ -39,26 +41,40 @@ class GameManager:
     ROLES_TOWNSFOLK = RoleName.get_by_class(RoleClass.TOWNSFOLK)
 
     def __init__(self, player_names: List[str]):
+        self.current_players = []
         self.player_names = player_names
-        self.roles_distribution = RoleDistributor(self.player_names)
-        self.players: List[Player] = self.assign_roles()
-        self.players_alive: List[Player] = self.players
+        
+        # Safe initialization check
+        if self.player_names:
+            self.roles_distribution = RoleDistributor(self.player_names)
+            self.players: List[Player] = self.assign_roles()
+            self.players_alive: List[Player] = self.players
+        else:
+            self.players = []
+            self.players_alive = []
+            
         self.turn_counter: int = 0
         self.killed_tonight: Optional[Player] = None
         self.game_master: GameMaster = GameMaster("GM")
         self.gameio: GameIO = GameIO()
         self.executed_player: str = ""
-
-        self.nominator: str = "" # variable to track who started vote
+        self.nominator: str = ""
         
-        self.vote_table: dict[str, dict[str,int]] = {}
         self._ini_vote_table()
         self.game_over: bool = False
+
+        # Init bot components, but DO NOT call bot.run() here
+        load_dotenv()
+        self.token = str(os.getenv("DISCORD_TOKEN"))
+        self.bot = BotMgr(self)
+        self.poll_manager = PollManager(self.bot)
+
+    def _start_game(self):
 
     def _ini_vote_table(self):
         self.vote_table: dict[str, dict[str,int]] = {}
         for p_name_i in self.player_names:
-            self.vote_table[p_name_i] = {p_name_j:0 for p_name_j in self.player_names}
+            self.vote_table[p_name_i] = {p_name_j: 0 for p_name_j in self.player_names}
 
     def assign_roles(self) -> List[Player]:
         d_count, o_count, t_count, m_count = (
@@ -136,7 +152,7 @@ class GameManager:
             player_name = input("Select Target: ")
         for p in self.players:
             if p.player_name == player_name: return p
-        raise ValueError(f"Player {player_name}")
+        raise ValueError(f"Player {player_name} not found.")
 
     def get_wake_order(self, is_first_night: bool) -> List[Player]:
         waking_players = []
@@ -184,29 +200,23 @@ class GameManager:
         self.turn_counter += 1
 
     def day(self) -> None:
-        # show all players the possible people to vote on 
-        # if they can vote let them vote
-        # tally scores see if any exceede 50%
-        ## Vote Logic --------------------
         self.executed_player = ""
         self._ini_vote_table()
         flat_votes: dict[str,int] = {k: v for inner_dict in self.vote_table.values() for k, v in inner_dict.items()}
-        vote_total = -1
+        
+        vote_total = sum(flat_votes.values())
+        if vote_total <= 0:
+            return
+            
         for candidate, vote_count in flat_votes.items():
-            vote_total += vote_count
-        vote_percentages = [vote_count/vote_total for candidate, vote_count in flat_votes.items()]
-        paired_scores = zip(flat_votes.keys(), vote_percentages)
-        for score in paired_scores:
-            candidate = score[0]
-            vote_percentage = score[1]
+            vote_percentage = vote_count / vote_total
             if vote_percentage > 0.5:
                 self.get_player_by_name(candidate).alive = False
                 self.executed_player = candidate
         return 
 
     def print_board(self):
-        output_str = ""
-        output_str += "\n" + "="*55 + "\n"
+        output_str = "\n" + "="*55 + "\n"
         for i, player in enumerate(self.players):
             status = "Alive" if player.alive else "DEAD"
             poison_str = " [POISONED]" if player.poisoned else ""
@@ -224,3 +234,14 @@ class GameManager:
         self.gameio.export_players_to_json(self.players, "game_state.json")
         return output_str
 
+    async def add_player(self, user_id: int):
+        user_id_str = str(user_id)
+        if user_id_str not in self.current_players:
+            self.current_players.append(user_id_str)
+
+    async def trigger_voting_phase(self, interaction: discord.Interaction):
+        if not self.current_players:
+            await interaction.response.send_message("No players in the game!")
+            return
+        poll_msg = await self.poll_manager.create_restricted_poll(interaction, self.current_players)
+        return poll_msg

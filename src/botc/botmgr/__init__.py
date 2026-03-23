@@ -6,7 +6,7 @@
 # from .player import Player
 # from .game import GameManager, GameMaster
 # from .utils import GameIO
-from .bot import BotMgr, TeamManagement
+from .bot import BotMgr, TeamManagement, PollManager
 # __all__ restricts what gets imported if someone uses `from botc import *`
 # __all__ = [
 #     "Alignment",

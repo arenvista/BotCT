@@ -1,41 +1,23 @@
 {
     "Alice": {
-        "actual_role": "IMP",
-        "believed_role": "IMP",
-        "registered_role": "IMP",
-        "registered_alignment": "EVIL",
+        "actual_role": "SLAYER",
+        "believed_role": "SLAYER",
+        "registered_role": "SLAYER",
+        "registered_alignment": "GOOD",
         "alive": true,
         "poisoned": false,
         "protected": false
     },
     "Bob": {
-        "actual_role": "INVESTIGATOR",
-        "believed_role": "INVESTIGATOR",
-        "registered_role": "INVESTIGATOR",
+        "actual_role": "DRUNK",
+        "believed_role": "UNDERTAKER",
+        "registered_role": "DRUNK",
         "registered_alignment": "GOOD",
         "alive": true,
         "poisoned": false,
         "protected": false
     },
     "Charlie": {
-        "actual_role": "MAYOR",
-        "believed_role": "MAYOR",
-        "registered_role": "MAYOR",
-        "registered_alignment": "GOOD",
-        "alive": true,
-        "poisoned": false,
-        "protected": false
-    },
-    "David": {
-        "actual_role": "BUTLER",
-        "believed_role": "BUTLER",
-        "registered_role": "BUTLER",
-        "registered_alignment": "GOOD",
-        "alive": true,
-        "poisoned": false,
-        "protected": false
-    },
-    "Eve": {
         "actual_role": "CHEF",
         "believed_role": "CHEF",
         "registered_role": "CHEF",
@@ -44,7 +26,16 @@
         "poisoned": false,
         "protected": false
     },
-    "Frank": {
+    "David": {
+        "actual_role": "IMP",
+        "believed_role": "IMP",
+        "registered_role": "IMP",
+        "registered_alignment": "EVIL",
+        "alive": true,
+        "poisoned": false,
+        "protected": false
+    },
+    "Eve": {
         "actual_role": "WASHERWOMAN",
         "believed_role": "WASHERWOMAN",
         "registered_role": "WASHERWOMAN",
@@ -53,19 +44,28 @@
         "poisoned": false,
         "protected": false
     },
+    "Frank": {
+        "actual_role": "FORTUNE_TELLER",
+        "believed_role": "FORTUNE_TELLER",
+        "registered_role": "FORTUNE_TELLER",
+        "registered_alignment": "GOOD",
+        "alive": true,
+        "poisoned": false,
+        "protected": false
+    },
     "Grace": {
-        "actual_role": "SPY",
-        "believed_role": "SPY",
-        "registered_role": "UNDERTAKER",
+        "actual_role": "SOLDIER",
+        "believed_role": "SOLDIER",
+        "registered_role": "SOLDIER",
         "registered_alignment": "GOOD",
         "alive": true,
         "poisoned": false,
         "protected": false
     },
     "Henry": {
-        "actual_role": "SLAYER",
-        "believed_role": "SLAYER",
-        "registered_role": "SLAYER",
+        "actual_role": "SPY",
+        "believed_role": "SPY",
+        "registered_role": "RECLUSE",
         "registered_alignment": "GOOD",
         "alive": true,
         "poisoned": false,

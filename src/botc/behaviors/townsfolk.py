@@ -277,7 +277,6 @@ class MayorBehavior(RoleBehavior):
     def act(self, player: Player, game: GameManager) -> None:
         # TODO: Implement Mayor
         
-
         if game.num_players_remaining != 3:
             return
 
