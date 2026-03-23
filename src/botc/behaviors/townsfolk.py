@@ -159,9 +159,9 @@ class UndertakerBehavior(RoleBehavior):
         if is_reliable: # not drunk or poisoned
             if executed_player.actual_role == RoleName.DRUNK:
                 # TODO: English hard. Idk if this sentence makes sense. Should we assume players are playing in person or online. DIADJSAdaosdk
-                print(f"Wake up {player.player_name} and tell them {executed_player.player_name} was a Drunk (or show them the Drunk Token).")
+                print(f"Wake up {player.player_name} and tell them {executed_player.player_name} was a Drunk.")
             else:
-                print(f"Wake up {player.player_name} and tell them {executed_player.player_name} was a {executed_player.actual_role} (or show them the {executed_player.actual_role} Token).")
+                print(f"Wake up {player.player_name} and tell them {executed_player.player_name} was a {executed_player.actual_role}.")
         else:
 
             # TODO: Check this out. Not sure how to give false information
@@ -196,25 +196,21 @@ class RavenkeeperBehavior(RoleBehavior):
         #    print(f"\nWake {player.believed_role} ({player.player_name}). They died! Let them point to a player, show them the role. Put to sleep.")
             # TODO: Implement RavenkeeperBehavior
 
-        # I FUCKING HATE THESE NEST IF STATEMENTS
-        # but I want to deal with the case where a player is both drunk and poisoned. In this case, the Game Master needs to give information that really fucks the good side.
-
-        random_float = random.random() # float from 0.0 - 1.0
-
-
-        if player.actual_role == RoleName.DRUNK: 
-            if player.poisoned: 
-                print(f"\n{player.believed_role} ({player.player_name}) has died! {player.player_name} is a Drunk and is Poisoned.\n Let them point to a player and give them information that screws the Good team. \nPut them to sleep.")
-            elif random_float <= 0.2: 
-                print(f"\nWake {player.believed_role} ({player.player_name}). They died! Since {player.player_name} is a Drunk and got LUCKY, let them point to a player and show them the right role. Put them to sleep.")
-            else: 
-                print(f"\nWake {player.believed_role} ({player.player_name}). They died! Since {player.player_name} is a Drunk, let them point to a player and show them the wrong role. Put them to sleep.")
-
         
-        if player.believed_role == RoleName.RAVENKEEPER: # Drunk case, player thinks their a Ravenkeeper
-            print(f"\n{player.believed_role} ({player.player_name}) has died!")
-            picked_player = input(f"Wake up {player.believed_role} ({player.player_name}) and have them point to another player. \n Who did they pick? ")
+        if player.alive: # if RavenKeeper is Alive, do nothing
+            return
 
+        is_reliable: bool = not (player.actual_role == RoleName.DRUNK or player.poisoned)
+
+        print(f"\n{player.believed_role} ({player.player_name}) has died!")
+        print(f"Wake up {player.believed_role} ({player.player_name}) and have them point to another player. \n Who did they pick? ")
+        target = game.get_player_by_name()
+
+        if is_reliable: # not drunk and not poisoned
+            print(f"{player.believed_role} ({player.player_name}) has picked {target.player_name}. There role is {target.actual_role}")
+        else:   
+            # TODO: call function to get fake info from Game Master
+            print(f"Give {player.believed_role}({player.player_name}) fake information on who they picked")
 
 
 @register_role(RoleName.VIRGIN)
@@ -224,7 +220,7 @@ class VirginBehavior(RoleBehavior):
         # only need to check if not drunk or poisoned and if nominator is aa townfolk
         
         is_reliable: bool = not (player.actual_role == RoleName.DRUNK or player.poisoned)
-        nominator: Player =  game.get_player_by_name(game.nominator)
+        nominator: Player =  game.get_player_by_name(next(iter(game.vote_table)))
 
         if is_reliable:
             if nominator.actual_role in ROLES_TOWNSFOLK:
@@ -278,7 +274,7 @@ class MayorBehavior(RoleBehavior):
         # TODO: Implement Mayor
         
 
-        if game.num_players_remaining != 3:
+        if len(game.players_alive) != 3:
             return
 
         if game.executed_player:
