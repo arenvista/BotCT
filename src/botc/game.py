@@ -34,8 +34,11 @@ class GameManager:
     ROLES_TOWNSFOLK = RoleName.get_by_class(RoleClass.TOWNSFOLK)
 
     def __init__(self, player_names: List[str]):
-        self.player_names = player_names
-        self.num_players = len(player_names)
+        self.player_names: str = player_names
+        self.num_players: int = len(player_names)
+
+        self.num_players_remaining: int = self.num_players
+
         self.roles_distribution = RoleDistributor(self.player_names)
         self.players: List[Player] = self.assign_roles()
         self.turn_counter: int = 0
@@ -43,8 +46,12 @@ class GameManager:
         self.game_master: GameMaster = GameMaster("GM")
         self.gameio: GameIO = GameIO()
         self.executed_player: str = ""
+
+        self.nominator: str = "" # variable to track who started vote
+        
         self.vote_table: dict[str, dict[str,int]] = {}
         self._ini_vote_table()
+        self.game_over: bool = False
 
     def _ini_vote_table(self):
         self.vote_table: dict[str, dict[str,int]] = {}
@@ -191,6 +198,8 @@ class GameManager:
             if vote_percentage > 0.5:
                 self.get_player_by_name(candidate).alive = False
                 self.executed_player = candidate
+            else:
+                self.executed_player = ""
         return 
 
     def print_board(self) -> None:
