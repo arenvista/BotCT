@@ -5,6 +5,11 @@ from typing import List, Optional, Tuple
 from botc.enums import Alignment, RoleClass, RoleName
 from botc.player import Player
 from botc.utils import GameIO
+from botc.botmgr import BotMgr, TeamManagement
+from time import sleep
+import logging
+from dotenv import load_dotenv
+import os 
 
 class GameMaster: 
     def __init__(self, player_name: str):
@@ -38,6 +43,7 @@ class GameManager:
         self.num_players = len(player_names)
         self.roles_distribution = RoleDistributor(self.player_names)
         self.players: List[Player] = self.assign_roles()
+        self.players_alive = self.players
         self.turn_counter: int = 0
         self.killed_tonight: Optional[Player] = None
         self.game_master: GameMaster = GameMaster("GM")
@@ -45,6 +51,8 @@ class GameManager:
         self.executed_player: str = ""
         self.vote_table: dict[str, dict[str,int]] = {}
         self._ini_vote_table()
+        self.game_over = False
+
 
     def _ini_vote_table(self):
         self.vote_table: dict[str, dict[str,int]] = {}
@@ -193,11 +201,9 @@ class GameManager:
                 self.executed_player = candidate
         return 
 
-    def print_board(self) -> None:
-        print("\n" + "="*55)
-        print(f"=== GRIMOIRE (STORYTELLER VIEW) - Turn {self.turn_counter} ===")
-        print("="*55)
-
+    def print_board(self):
+        output_str = ""
+        output_str += "\n" + "="*55 + "\n"
         for i, player in enumerate(self.players):
             status = "Alive" if player.alive else "DEAD"
             poison_str = " [POISONED]" if player.poisoned else ""
@@ -210,6 +216,8 @@ class GameManager:
             else:
                 role_info = f"{player.actual_role} ({player.registered_alignment})"
 
-            print(f"Seat {i+1:02d} | {player.player_name:<8} | {status:<5} | {role_info}{poison_str}{protect_str}")
-        print("="*55 + "\n")
+            output_str += f"Seat {i+1:02d} | {player.player_name:<8} | {status:<5} | {role_info}{poison_str}{protect_str}\n"
+        output_str += "="*55 + "\n"
         self.gameio.export_players_to_json(self.players, "game_state.json")
+        return output_str
+

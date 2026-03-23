@@ -1,41 +1,5 @@
 {
     "Alice": {
-        "actual_role": "WASHERWOMAN",
-        "believed_role": "WASHERWOMAN",
-        "registered_role": "WASHERWOMAN",
-        "registered_alignment": "GOOD",
-        "alive": true,
-        "poisoned": false,
-        "protected": false
-    },
-    "Bob": {
-        "actual_role": "BARON",
-        "believed_role": "BARON",
-        "registered_role": "BARON",
-        "registered_alignment": "EVIL",
-        "alive": true,
-        "poisoned": false,
-        "protected": false
-    },
-    "Charlie": {
-        "actual_role": "SAINT",
-        "believed_role": "SAINT",
-        "registered_role": "SAINT",
-        "registered_alignment": "GOOD",
-        "alive": true,
-        "poisoned": false,
-        "protected": false
-    },
-    "David": {
-        "actual_role": "DRUNK",
-        "believed_role": "LIBRARIAN",
-        "registered_role": "DRUNK",
-        "registered_alignment": "GOOD",
-        "alive": true,
-        "poisoned": false,
-        "protected": false
-    },
-    "Eve": {
         "actual_role": "IMP",
         "believed_role": "IMP",
         "registered_role": "IMP",
@@ -44,28 +8,64 @@
         "poisoned": false,
         "protected": false
     },
+    "Bob": {
+        "actual_role": "INVESTIGATOR",
+        "believed_role": "INVESTIGATOR",
+        "registered_role": "INVESTIGATOR",
+        "registered_alignment": "GOOD",
+        "alive": true,
+        "poisoned": false,
+        "protected": false
+    },
+    "Charlie": {
+        "actual_role": "MAYOR",
+        "believed_role": "MAYOR",
+        "registered_role": "MAYOR",
+        "registered_alignment": "GOOD",
+        "alive": true,
+        "poisoned": false,
+        "protected": false
+    },
+    "David": {
+        "actual_role": "BUTLER",
+        "believed_role": "BUTLER",
+        "registered_role": "BUTLER",
+        "registered_alignment": "GOOD",
+        "alive": true,
+        "poisoned": false,
+        "protected": false
+    },
+    "Eve": {
+        "actual_role": "CHEF",
+        "believed_role": "CHEF",
+        "registered_role": "CHEF",
+        "registered_alignment": "GOOD",
+        "alive": true,
+        "poisoned": false,
+        "protected": false
+    },
     "Frank": {
-        "actual_role": "RECLUSE",
-        "believed_role": "RECLUSE",
-        "registered_role": "RECLUSE",
+        "actual_role": "WASHERWOMAN",
+        "believed_role": "WASHERWOMAN",
+        "registered_role": "WASHERWOMAN",
         "registered_alignment": "GOOD",
         "alive": true,
         "poisoned": false,
         "protected": false
     },
     "Grace": {
-        "actual_role": "MONK",
-        "believed_role": "MONK",
-        "registered_role": "MONK",
+        "actual_role": "SPY",
+        "believed_role": "SPY",
+        "registered_role": "UNDERTAKER",
         "registered_alignment": "GOOD",
         "alive": true,
         "poisoned": false,
         "protected": false
     },
     "Henry": {
-        "actual_role": "BUTLER",
-        "believed_role": "BUTLER",
-        "registered_role": "BUTLER",
+        "actual_role": "SLAYER",
+        "believed_role": "SLAYER",
+        "registered_role": "SLAYER",
         "registered_alignment": "GOOD",
         "alive": true,
         "poisoned": false,

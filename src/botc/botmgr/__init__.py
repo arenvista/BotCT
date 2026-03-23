@@ -1,6 +1,4 @@
 # src/botmgr/__init__.py
-"""
-"""
 
 # Expose the primary classes and enums at the package level 
 # so they can be imported directly from 'botc'.
@@ -8,7 +6,7 @@
 # from .player import Player
 # from .game import GameManager, GameMaster
 # from .utils import GameIO
-#
+from .bot import BotMgr, TeamManagement
 # __all__ restricts what gets imported if someone uses `from botc import *`
 # __all__ = [
 #     "Alignment",

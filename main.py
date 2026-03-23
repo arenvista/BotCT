@@ -6,6 +6,13 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent / "src"))
 
 from botc import GameManager, RoleName
+from botc.interface import Interface
+from botc.botmgr import BotMgr
+
+from time import sleep
+import logging
+from dotenv import load_dotenv
+import os 
 
 def main():
     example = ["Alice", "Bob", "Charlie", "David", "Eve", "Frank", "Grace", "Henry"]
@@ -19,8 +26,17 @@ def main():
             print(f"{prefix}: {player.actual_role} (Registers as {player.registered_role}/{player.registered_alignment})")
         else:
             print(f"{prefix}: {player.actual_role} (Alignment: {player.registered_alignment})")
-            
+    # Instantiate and run the bot class
+    load_dotenv()
+    token = str(os.getenv("DISCORD_TOKEN"))
+    # Setup logging
+    handler = logging.FileHandler(filename="discord.log", encoding="utf-8", mode="w")
+    # Instantiate and run the bot class
+    bot = BotMgr(game)
+    bot.run(token, log_handler=handler, log_level=logging.DEBUG)
     game.night_one()
+    while input != "z":
+        sleep(10)
     # game.print_board()
     # game.night_next()
     # game.print_board()
