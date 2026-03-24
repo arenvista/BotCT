@@ -3,8 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, List
 if TYPE_CHECKING:                        
     from botc.player import Player
-    from botc.game import GameManager
-    from botc.utils.game_io import GameIO
+    from botc.core.game import GameManager
 
 import random
 from botc.enums import RoleName, Alignment, RoleClass

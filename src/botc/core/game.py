@@ -109,7 +109,16 @@ class GameManager:
         self.players_alive = self.players
 
         await self.message_roles_to_players()
-        await self.start_voting_phase(interaction)
+
+        for player in self.get_wake_order(is_first_night=True):
+            player.take_action(self)
+
+        while(self.game_over != True):
+            self.night_counter+=1
+            await self.start_voting_phase(interaction)
+            self.day_counter+=1
+            for player in self.get_wake_order(is_first_night=False):
+                player.take_action(self)
 
     async def message_roles_to_players(self):
         for player in self.players:
@@ -170,7 +179,7 @@ class GameManager:
         waking_players.sort(key=lambda x: x[0])
         return [p for priority, p in waking_players]
 
-    def export_and_format_board(self) -> str:
+    def get_board_str(self) -> str:
         output_str = "\n" + "="*55 + "\n"
         for i, player in enumerate(self.players):
             status = "Alive" if player.alive else "DEAD"

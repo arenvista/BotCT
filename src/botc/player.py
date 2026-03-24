@@ -6,7 +6,7 @@ from botc.behaviors import BEHAVIOR_MAP
 from botc.behaviors.base import PassiveBehavior
 
 if TYPE_CHECKING:
-    from botc.game import GameManager
+    from botc.core.game import GameManager
     from botc.behaviors.base import RoleBehavior
 
 class Player: 

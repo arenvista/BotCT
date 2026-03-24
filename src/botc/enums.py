@@ -10,7 +10,6 @@ class Alignment(Enum):
         return self.name.title()
 
 class RoleClass(Enum):
-    NULL = -1
     GAMEMASTER = 0
     DEMONS = 1
     MINIONS = 2

@@ -1,5 +1,6 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Optional
+
 import discord
 import asyncio
 import datetime
@@ -54,6 +55,7 @@ class PollManager:
         except Exception:
             poll_message = await thread.fetch_message(poll_message.id)
 
+        if poll_message.poll == None: raise ValueError("Poll Msg Returned Null")
         yes_votes: Optional[discord.PollAnswer] = discord.utils.get(poll_message.poll.answers, text="Yes")
         candidates: list[discord.User | discord.Member] = []
         
@@ -158,5 +160,5 @@ class PollManager:
             except ValueError as e:
                 await thread.send(f"⚠️ Error: Could not find player.")
 
-        print(self.game.export_and_format_board())
+        print(self.game.get_board_str())
         return poll_message
