@@ -1,5 +1,5 @@
 [project]
-name = "botct"
+name = "botc"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
@@ -8,4 +8,13 @@ dependencies = [
     "discord>=2.3.2",
     "discord-py>=2.7.1",
     "dotenv>=0.9.9",
+    "pillow>=12.1.1",
+    "pytest>=9.0.2",
 ]
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
