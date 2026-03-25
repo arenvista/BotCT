@@ -29,12 +29,17 @@ class Deck: #each game will have one instance of the deck class
     def __init__(self,encounter_list: List[Encounter],count_list:List[int]):
         
 <<<<<<< HEAD
+<<<<<<< HEAD
         self.unresolved_encounter_card_list:List[EncounterCard]=[]
         self.resolved_encounter_card_list:List[EncounterCard]=[]
 =======
         self.unresolved_encounter_card_list=[]
         self.resolved_encounter_card_list=[]
 >>>>>>> b2df120 (renamed)
+=======
+        self.unresolved_encounter_card_list:List[EncounterCard]=[]
+        self.resolved_encounter_card_list:List[EncounterCard]=[]
+>>>>>>> ff39529 (we can log encounter flavor text now)
         for encounter,count in zip(encounter_list,count_list):
             self.unresolved_encounter_card_list.extend([EncounterCard(encounter) for _ in range(count)])
         update_possibilities()
@@ -70,6 +75,9 @@ class Deck: #each game will have one instance of the deck class
     
     def __len__(self):
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> ff39529 (we can log encounter flavor text now)
         return len(self.unresolved_encounter_card_list)+len(self.resolved_encounter_card_list)
     
     def __bool__(self):
@@ -81,7 +89,11 @@ class Deck: #each game will have one instance of the deck class
             if card.specific_encounter:
                 return True
             
+<<<<<<< HEAD
         return False
 =======
         return len(self.unresolved_encounter_card_list)+len(self.resolved_encounter_card_list)
 >>>>>>> b2df120 (renamed)
+=======
+        return False
+>>>>>>> ff39529 (we can log encounter flavor text now)

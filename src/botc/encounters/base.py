@@ -42,11 +42,17 @@ class Encounter(ABC):
     def __str__(self):
         return f"{self.name} {self.parents_resolved} {self.impossible}"
 <<<<<<< HEAD
+<<<<<<< HEAD
     
     def __bool__(self):
         return self.parents_resolved and not self.impossible
 =======
 >>>>>>> b2df120 (renamed)
+=======
+    
+    def __bool__(self):
+        return self.parents_resolved and not self.impossible
+>>>>>>> ff39529 (we can log encounter flavor text now)
 
 def update_possibilities():
     for key,encounter in ENCOUNTER_MAP.items():
