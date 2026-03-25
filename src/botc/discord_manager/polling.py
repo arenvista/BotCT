@@ -15,13 +15,19 @@ class PollManager:
     def __init__(self, game: GameManager) -> None:
         self.game: GameManager = game
 
-    async def run_gamemaster_poll(self, interaction: discord.Interaction, allowed_player_ids: list[str]) -> Optional[discord.Message]:
+    async def run_gamemaster_poll(self, interaction: discord.Interaction, allowed_player_names: list[str]) -> Optional[discord.Message]:
         if not isinstance(interaction.channel, discord.TextChannel):
             error_msg = "This action can only be used in a text channel."
-            await interaction.followup.send(error_msg, ephemeral=True) if interaction.response.is_done() else await interaction.response.send_message(error_msg, ephemeral=True)
+            if interaction.response.is_done():
+                await interaction.followup.send(error_msg, ephemeral=True) 
+            else:
+                await interaction.response.send_message(error_msg, ephemeral=True)
             return None
 
-        await interaction.followup.send("Creating GM poll...", ephemeral=True) if interaction.response.is_done() else await interaction.response.send_message("Creating GM poll...", ephemeral=True)
+        if interaction.response.is_done():
+            await interaction.followup.send("Creating GM poll...", ephemeral=True) 
+        else:
+            await interaction.response.send_message("Creating GM poll...", ephemeral=True)
 
         duration_minutes: int = 4
         poll = discord.Poll(
@@ -38,14 +44,18 @@ class PollManager:
 
         poll_message: discord.Message = await thread.send(poll=poll)
         
-        num_players: int = len(allowed_player_ids)
+        num_players: int = len(allowed_player_names)
         max_wait_time: int = duration_minutes * 60
         elapsed_time: int = 0
 
+        # Safe Polling Loop with HTTP Exception catching
         while elapsed_time < max_wait_time:
             await asyncio.sleep(5)
             elapsed_time += 5
-            poll_message = await thread.fetch_message(poll_message.id)
+            try:
+                poll_message = await thread.fetch_message(poll_message.id)
+            except discord.HTTPException:
+                continue
             
             if poll_message.poll and sum(a.vote_count for a in poll_message.poll.answers) >= num_players:
                 break
@@ -53,21 +63,51 @@ class PollManager:
         try:
             poll_message = await poll_message.end_poll()
         except Exception:
-            poll_message = await thread.fetch_message(poll_message.id)
+            try:
+                poll_message = await thread.fetch_message(poll_message.id)
+            except discord.HTTPException:
+                pass
 
-        if poll_message.poll == None: raise ValueError("Poll Msg Returned Null")
+        if poll_message.poll is None: 
+            raise ValueError("Poll Msg Returned Null")
+            
         yes_votes: Optional[discord.PollAnswer] = discord.utils.get(poll_message.poll.answers, text="Yes")
         candidates: list[discord.User | discord.Member] = []
         
         if yes_votes:
+            # Clean up the allowed list so we can match it safely against Discord users
+            clean_allowed_names = [n.lstrip('@').lower() for n in allowed_player_names]
+            
             async for user in yes_votes.voters():
-                if str(user.id) in allowed_player_ids:
+                user_clean = user.name.lower()
+                global_clean = user.global_name.lower() if user.global_name else ""
+                
+                # FIXED: Checking usernames instead of IDs
+                if user_clean in clean_allowed_names or global_clean in clean_allowed_names:
                     candidates.append(user)
 
         if candidates:
             selected_gm = random.choice(candidates)
             self.game.game_master = selected_gm.name
             await thread.send(f"🎲 The randomly selected GM is {selected_gm.mention}!")
+            
+            # 1. Try to remove them from instantiated player lists (if they exist yet)
+            try:
+                # FIXED: Removed 'await' since get_player_by_name is synchronous
+                gm_player = self.game.get_player_by_name(selected_gm.name)
+                if gm_player in self.game.players:
+                    self.game.players.remove(gm_player)
+                if gm_player in self.game.players_alive:
+                    self.game.players_alive.remove(gm_player)
+            except ValueError:
+                pass # Player not found in list, which is fine
+                
+            # 2. FIXED: Remove them from the raw name list so they don't get dealt a role!
+            for name in allowed_player_names:
+                clean_n = name.lstrip('@').lower()
+                if clean_n == selected_gm.name.lower() or (selected_gm.global_name and clean_n == selected_gm.global_name.lower()):
+                    self.game.player_names.remove(name)
+                    break
         else:
             await thread.send("Nobody volunteered to be the GM.")
 

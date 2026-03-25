@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from botc.core.game import GameManager
     from botc.discord_manager.bot import BotManager
 
-from botc.discord_manager.views import JoinLobbyView
+from botc.discord_manager.views import JoinLobbyView, DropdownView
 from botc.discord_manager.polling import PollManager
 
 class GameCommands(commands.Cog):
@@ -19,10 +19,50 @@ class GameCommands(commands.Cog):
         self.bot: BotManager = bot
         self.game: GameManager = game
 
-    # CHANGED: Now accepts user_name (str)
+    async def dmdropdown(self, user_name: str, message_text: str, dropdown_options: List[str], max_selection: int) -> Optional[List[str]]:
+        if len(dropdown_options) > 25:
+            raise ValueError("Dropdowns must have <= 25 options")
+            
+        clean_name: str = user_name.lstrip('@').lower()
+        
+        # 1. Fetch user safely using their string username
+        user: discord.User | None = discord.utils.find(
+            lambda u: u.name.lower() == clean_name or (u.global_name and u.global_name.lower() == clean_name), 
+            self.bot.users
+        )
+        
+        if user is None:
+            print(f"❌ Could not find user with name '{user_name}' in cache.")
+            return None
+            
+        # 2. Instantiate the View we created above
+        view = DropdownView(options=dropdown_options, max_selection=max_selection)
+        
+        # 3. Send the DM
+        try:
+            message: discord.Message = await user.send(content=message_text, view=view)
+        except (discord.Forbidden, discord.HTTPException):
+            return None
+            
+        # 4. Wait politely until the user clicks something or the 1-hour timeout hits.
+        # This replaces your while-loop entirely!
+        is_timeout = await view.wait()
+        
+        # 5. Handle the results
+        if is_timeout:
+            # User ignored the DM for an hour. Disable the menu so it locks.
+            try:
+                view.select.disabled = True
+                await message.edit(content="⏳ **Time expired.**", view=view)
+            except discord.HTTPException:
+                pass
+            return None
+            
+        return view.selected_values
+
     async def dmpoll(self, user_name: str, poll_message: str, poll_options: List[str], max_selection: int) -> Optional[List[str]]:
-        if len(poll_options) > 10:
-            raise ValueError("Poll Must be <= 10")
+        if len(poll_options) > 10 or max_selection == 1:
+            return await self.dmdropdown(user_name, poll_message, poll_options, max_selection)
         
         # 1. Fetch user safely using their string username
         clean_name: str = user_name.lstrip('@').lower()

@@ -29,8 +29,7 @@ class SpyBehavior(RoleBehavior):
     other_night_priority = 3
 
     async def act(self, player: Player, game: GameManager) -> None:
-        prompt = f"\nWake {player.believed_role} ({player.player_name}). Show them the Grimoire. Put to sleep."
-        print(prompt)
+        await game.command_cog.send_direct_message(player.player_name,game.get_board_str())
 
 @register_role(RoleName.SCARLET_WOMAN)
 class ScarletWomanBehavior(RoleBehavior):
