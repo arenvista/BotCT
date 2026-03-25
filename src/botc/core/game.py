@@ -49,6 +49,10 @@ class GameManager:
         self.bot = BotManager(self)
         self.poll_manager = PollManager(self)
         self.command_cog = GameCommands(self.bot, self)
+
+    async def modify_information(self, message: str, choices: List[str], max_input: int):
+        return await self.command_cog.dmpoll(self.game_master, message, choices, max_input)
+
     def reset_vote_table(self):
         self.vote_table = {
             voter: {candidate: 0 for candidate in self.player_names}
@@ -105,7 +109,7 @@ class GameManager:
     async def start_game(self, interaction: discord.Interaction):
         # self.roles_distribution = RoleDistributor(self.player_names)
         # self.players = self.assign_roles()
-        self.players.append(Player("@iiiii5184",RoleName.POISONER, RoleName.POISONER, RoleName.POISONER, Alignment.EVIL))
+        self.players.append(Player("@iiiii5184",RoleName.WASHERWOMAN, RoleName.WASHERWOMAN, RoleName.WASHERWOMAN, Alignment.GOOD))
         self.players_alive = self.players
 
         await self.message_roles_to_players()

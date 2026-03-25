@@ -1,5 +1,5 @@
 # For teh Boys 
-[Jira Board](https://jlbaker361.atlassian.net/jira/software/projects/DEV/boards/2?cloudId=d76535b5-2b10-4a1f-9b88-1318d015c37a&atlOrigin=eyJwIjoiaiIsImkiOiI2OWJkYzgyMGFiNzI0OTRhYTQwMmNjODAyODFkNDlkYSJ9&visitedUserSeg=true)
+[Jira Board](https://jlbaker362.atlassian.net/jira/software/projects/DEV/boards/2?cloudId=d76535b5-2b10-4a1f-9b88-1318d015c37a&atlOrigin=eyJwIjoiaiIsImkiOiI2OWJkYzgyMGFiNzI0OTRhYTQwMmNjODAyODFkNDlkYSJ9&visitedUserSeg=true)
 
 # BotC Helper
 A small Python project that simulates parts of ***Blood on the Clocktower: Trouble Brewing*** night flow for a Storyteller.

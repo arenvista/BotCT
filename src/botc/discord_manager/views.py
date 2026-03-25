@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import List, Optional
 from typing import TYPE_CHECKING
 import discord
 
@@ -64,3 +65,37 @@ class JoinLobbyView(discord.ui.View):
         else:
             await interaction.response.send_message(f"Players: " + ",".join(self.game.player_names), ephemeral=True)
             await interaction.response.send_message("⚠️ You are already in the game!", ephemeral=True)
+
+class DropdownView(discord.ui.View):
+    def __init__(self, options: List[str], max_selection: int, timeout: float = 3600.0):
+        # Set the timeout (default 1 hour)
+        super().__init__(timeout=timeout)
+        self.selected_values: Optional[List[str]] = None
+
+        # Discord Dropdowns support up to 25 options (better than Polls' 10!)
+        select_options = [discord.SelectOption(label=opt) for opt in options[:25]]
+        
+        # Create the Select menu component
+        self.select = discord.ui.Select(
+            placeholder=f"Select up to {max_selection}...",
+            min_values=1,
+            max_values=max_selection,
+            options=select_options
+        )
+        
+        # Bind the callback function
+        self.select.callback = self.select_callback
+        self.add_item(self.select)
+
+    async def select_callback(self, interaction: discord.Interaction):
+        # 1. Grab the values the user clicked
+        self.selected_values = self.select.values
+        
+        # 2. Disable the menu so they can't change their mind later
+        self.select.disabled = True
+        
+        # 3. Acknowledge the interaction and update the message visually
+        await interaction.response.edit_message(content="✅ **Selection locked in!**", view=self)
+        
+        # 4. Stop the view, which tells the `await view.wait()` in your cog to continue
+        self.stop()
