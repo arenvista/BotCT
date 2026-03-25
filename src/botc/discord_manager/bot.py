@@ -2,6 +2,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 import discord
 from discord.ext import commands
+from dotenv import load_dotenv
+import os
 
 if TYPE_CHECKING:
     from botc.core.game import GameManager
@@ -22,7 +24,13 @@ class BotManager(commands.Bot):
         await self.add_cog(GameCommands(self, self.game))
         
         # Fast syncing for testing server
-        TEST_SERVER: discord.Object = discord.Object(id=1373836529390190602) 
+        try:
+            load_dotenv()
+            TEST_SERVER: discord.Object = discord.Object(id=os.getenv("SERVER_ID")) 
+            
+        except:
+            TEST_SERVER: discord.Object = discord.Object(id=1373836529390190602) 
+            
         self.tree.copy_global_to(guild=TEST_SERVER)
         await self.tree.sync(guild=TEST_SERVER)
         print("Hooking in custom commands and syncing to test server.")
