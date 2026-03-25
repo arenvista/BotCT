@@ -21,9 +21,14 @@ def main():
 if __name__ == "__main__":
     parser=argparse.ArgumentParser()
     parser.add_argument("--testing",action="store_true")
+    parser.add_argument("--disable_voting",action="store_true")
     args=parser.parse_args()
     if args.testing:
         os.environ["TESTING"] = "1"
     else:
         os.environ["TESTING"]="0"
+    if args.disable_voting:
+        os.environ["VOTING"]="0"
+    else:
+        os.environ["VOTING"]="1"
     main()
