@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 from botc.enums import Alignment, RoleClass, RoleName
 from botc.player import Player
 from botc.core.distribution import RoleDistributor
+from botc.events import Deck
 
 # Import Discord components
 from botc.discord_manager.bot import BotManager
@@ -21,6 +22,8 @@ class GameManager:
 
     def __init__(self, player_names: List[str] = []):
         self.player_names = player_names
+        self.event_interval=1 #how frequently to do an event, hardcoded for now
+        self.event_deck=Deck.from_json("default")
         
         if self.player_names:
             self.roles_distribution = RoleDistributor(self.player_names)
@@ -105,6 +108,11 @@ class GameManager:
             )
 
         return assigned_players
+    
+    def resolve_temporary_conditions(self):
+        for player in self.players:
+            player.protected=False
+            player.poisoned=False
 
     async def start_game(self, interaction: discord.Interaction):
         # self.roles_distribution = RoleDistributor(self.player_names)
@@ -121,6 +129,7 @@ class GameManager:
             self.night_counter+=1
             await self.start_voting_phase(interaction)
             self.day_counter+=1
+            
             for player in self.get_wake_order(is_first_night=False):
                 await player.take_action(self)
 
