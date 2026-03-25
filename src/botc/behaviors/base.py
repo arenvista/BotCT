@@ -47,4 +47,6 @@ class RoleBehavior(ABC):
     async def act(self, player: Player, game: GameManager) -> None:
         pass
 
-# ... (PassiveBehavior stays the same)
+class PassiveBehavior(RoleBehavior):
+    async def act(self, player: Player, game: GameManager) -> None:
+        pass
