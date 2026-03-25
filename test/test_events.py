@@ -36,3 +36,9 @@ def test_deck():
     
     with pytest.raises(IndexError):
         card=my_deck.draw_card()
+        
+    reset_resolved()
+    my_deck=deck.Deck([EVENT_MAP[simple.ONESHOT_EVENT_ENUM]],[10])
+    card=my_deck.draw_card()
+    with pytest.raises(IndexError):
+        card=my_deck.draw_card()    
