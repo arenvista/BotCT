@@ -8,7 +8,7 @@ from . import register_role
 
 if TYPE_CHECKING:
     from botc.player import Player
-    from botc.game import GameManager
+    from botc.core.game import GameManager
 
 
 class RoleBehavior(ABC):
@@ -17,7 +17,7 @@ class RoleBehavior(ABC):
     is_reliable: bool = True # Determine reliablity of information if poisioned/drunk
 
     @abstractmethod
-    def act(self, player: Player, game: GameManager) -> None:
+    async def act(self, player: Player, game: GameManager) -> None:
         pass
 
 @register_role(
@@ -25,5 +25,5 @@ class RoleBehavior(ABC):
     RoleName.VIRGIN, RoleName.SLAYER, RoleName.SOLDIER, RoleName.MAYOR
 )
 class PassiveBehavior(RoleBehavior):
-    def act(self, player: Player, game: GameManager) -> None:
+    async def act(self, player: Player, game: GameManager) -> None:
         pass

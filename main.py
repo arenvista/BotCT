@@ -14,6 +14,7 @@ def main():
     example = ["Alice", "Bob", "Charlie", "David", "Eve", "Frank", "Grace", "Henry"]
     game = GameManager(example)
     game.bot.run(game.token)
+    print("done")
     while input() != "z":
         sleep(10)
 
