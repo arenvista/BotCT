@@ -1,0 +1,5 @@
+NULL_EVENT_ENUM="null_event"
+NULL_EVENT_CHILD_ENUM="null_event_child"
+NULL_EVENT_ANTI_CHILD_ENUM="null_event_anti_child"
+ONESHOT_EVENT_ENUM="oneshot_event"
+FLAVOR_TEXT_EVENT_ENUM="flavor_text_event"

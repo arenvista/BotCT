@@ -3,11 +3,7 @@ simple events- for testing so far
 '''
 
 from .base import Event,register_event,EVENT_MAP
-
-NULL_EVENT_ENUM="null_event"
-NULL_EVENT_CHILD_ENUM="null_event_child"
-NULL_EVENT_ANTI_CHILD_ENUM="null_event_anti_child"
-ONESHOT_EVENT_ENUM="oneshot_event"
+from .enums import *
 
 @register_event(NULL_EVENT_ENUM,[],[])
 class NullEvent(Event):
@@ -28,3 +24,11 @@ class NullEventAntiChild(Event):
 class OneShotEvent(Event):
     async def resolve(self,*args,**kwargs):
         pass
+    
+@register_event(FLAVOR_TEXT_EVENT_ENUM,[],[])
+class FlavorTextEvent(Event):
+    def __init__(self, name, dependency_names, anti_dependency_names):
+        super().__init__(name, dependency_names, anti_dependency_names)
+        self.flavor_text="A crazy event just happened wow!!!"
+    async def resolve(self, *args, **kwargs):
+        return self.flavor_text
