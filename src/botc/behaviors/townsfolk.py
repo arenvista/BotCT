@@ -18,7 +18,7 @@ ROLES_TOWNSFOLK = RoleName.get_by_class(RoleClass.TOWNSFOLK)
 @register_role(RoleName.WASHERWOMAN)
 class WasherwomanBehavior(RoleBehavior):
     first_night_priority = 3
-    def act(self, player: Player, game: GameManager):
+    async def act(self, player: Player, game: GameManager):
         is_reliable: bool = player.actual_role == RoleName.DRUNK or player.poisoned
         selected_players: List[str] = []
         role_to_reveal: str = ""
@@ -37,7 +37,7 @@ class WasherwomanBehavior(RoleBehavior):
 @register_role(RoleName.LIBRARIAN)
 class LibrarianBehavior(RoleBehavior):
     first_night_priority = 4
-    def act(self, player: Player, game: GameManager):
+    async def act(self, player: Player, game: GameManager):
         is_reliable: bool = player.actual_role == RoleName.DRUNK or player.poisoned
         selected_players: List[str] = []
         role_to_reveal: str = ""
@@ -56,7 +56,7 @@ class LibrarianBehavior(RoleBehavior):
 @register_role(RoleName.INVESTIGATOR)
 class InvestigatorBehavior(RoleBehavior):
     first_night_priority = 5
-    def act(self, player: Player, game: GameManager):
+    async def act(self, player: Player, game: GameManager):
         is_reliable: bool = player.actual_role == RoleName.DRUNK or player.poisoned
         selected_players: List[str] = []
         role_to_reveal: str = ""
@@ -73,7 +73,7 @@ class InvestigatorBehavior(RoleBehavior):
 @register_role(RoleName.CHEF)
 class ChefBehavior(RoleBehavior):
     first_night_priority = 6
-    def act(self, player: Player, game: GameManager):
+    async def act(self, player: Player, game: GameManager):
         print(f"\nWake {player.believed_role} ({player.player_name}). Show them pairs of evil players. Put to sleep.")
         # TODO: Implement Logic
 
@@ -117,7 +117,7 @@ class EmpathBehavior(RoleBehavior):
     first_night_priority = 7
     other_night_priority = 8
 
-    def act(self, player: Player, game: GameManager) -> None:
+    async def act(self, player: Player, game: GameManager) -> None:
         is_reliable: bool = player.actual_role == RoleName.DRUNK or player.poisoned
         left_neighbor, right_neighbor = game.get_alive_neighbors(player)
         evil_count = 0
@@ -131,7 +131,7 @@ class EmpathBehavior(RoleBehavior):
 class FortuneTellerBehavior(RoleBehavior):
     first_night_priority = 8
     other_night_priority = 9
-    def act(self, player: Player, game: GameManager):
+    async def act(self, player: Player, game: GameManager):
         possible_selections: List[Player] = [p for p in game.players if p.alive == True and p != player]
         selected_player_names: List[str] = []
         selected_player_names.append(game.gameio.get_user_choice([p.player_name for p in possible_selections], "Select First Player to Divine"))
@@ -144,7 +144,7 @@ class FortuneTellerBehavior(RoleBehavior):
 @register_role(RoleName.UNDERTAKER)
 class UndertakerBehavior(RoleBehavior):
     other_night_priority = 7
-    def act(self, player: Player, game: GameManager):
+    async def act(self, player: Player, game: GameManager):
         #print(f"\nWake {player.believed_role} ({player.player_name}). Show them the role of todays executed player. Put to sleep.")
         # TODO: Implement UndertakerBehavior
         # TODO: Print statements need to be updated. Display class than name in some cases.
@@ -178,7 +178,7 @@ class UndertakerBehavior(RoleBehavior):
 @register_role(RoleName.MONK)
 class MonkBehavior(RoleBehavior):
     other_night_priority = 2
-    def act(self, player: Player, game: GameManager) -> None:
+    async def act(self, player: Player, game: GameManager) -> None:
         prompt = f"\nWake {player.believed_role} ({player.player_name}). Who do they protect?"
         print(prompt)
         target = game.get_player_by_name()
@@ -188,7 +188,7 @@ class MonkBehavior(RoleBehavior):
 @register_role(RoleName.RAVENKEEPER)
 class RavenkeeperBehavior(RoleBehavior):
     other_night_priority = 6
-    def act(self, player: Player, game: GameManager) -> None:
+    async def act(self, player: Player, game: GameManager) -> None:
             
         # drunk can be ravenkeeper but has fake info
         #if game.killed_tonight == player and player.registered_role == RoleName.RAVENKEEPER:
@@ -218,7 +218,7 @@ class RavenkeeperBehavior(RoleBehavior):
 
 @register_role(RoleName.VIRGIN)
 class VirginBehavior(RoleBehavior):
-    def act(self, player: Player, game: GameManager) -> None:
+    async def act(self, player: Player, game: GameManager) -> None:
         # TODO: Implement Virgin
         # only need to check if not drunk or poisoned and if nominator is aa townfolk
         
@@ -234,7 +234,7 @@ class VirginBehavior(RoleBehavior):
 
 @register_role(RoleName.SLAYER)
 class SlayerBehavior(RoleBehavior):
-    def act(self, player: Player, game: GameManager) -> None:
+    async def act(self, player: Player, game: GameManager) -> None:
         # TODO: Implement Slayer
 
         is_reliable: bool = not (player.actual_role == RoleName.DRUNK or player.poisoned)
@@ -261,7 +261,7 @@ class SlayerBehavior(RoleBehavior):
 class SoldierBehavior(RoleBehavior):
     first_night_priority = 100 # not sure what to set this as
     other_night_priority = 100 # not sure what to set this as
-    def act(self, player: Player, game: GameManager) -> None:
+    async def act(self, player: Player, game: GameManager) -> None:
         # TODO: Implement Soldier
         
         is_reliable: bool = not (player.actual_role == RoleName.DRUNK or player.poisoned)
@@ -273,7 +273,7 @@ class SoldierBehavior(RoleBehavior):
 
 @register_role(RoleName.MAYOR)
 class MayorBehavior(RoleBehavior):
-    def act(self, player: Player, game: GameManager) -> None:
+    async def act(self, player: Player, game: GameManager) -> None:
         # TODO: Implement Mayor
         
         if game.num_players_remaining != 3:

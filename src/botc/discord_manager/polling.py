@@ -162,3 +162,4 @@ class PollManager:
 
         print(self.game.get_board_str())
         return poll_message
+

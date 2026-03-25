@@ -30,10 +30,10 @@ class Player:
             return Alignment.EVIL
         return Alignment.GOOD
 
-    def take_action(self, game: GameManager):
+    async def take_action(self, game: GameManager):
         if not self.alive and self.believed_role != RoleName.RAVENKEEPER:
             return
-        self.role_behavior.act(self, game)
+        await self.role_behavior.act(self, game)
 
     def _to_dict(self) -> dict:
         return {

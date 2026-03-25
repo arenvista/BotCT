@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING         
 if TYPE_CHECKING:                        
     from botc.player import Player
-    from botc.game import GameManager
+    from botc.core.game import GameManager
 
 from botc.enums import RoleName, Alignment
 from .base import RoleBehavior
@@ -14,19 +14,21 @@ class PoisonerBehavior(RoleBehavior):
     first_night_priority = 1
     other_night_priority = 1
 
-    def act(self, player: Player, game: GameManager) -> None:
-        prompt = f"\nWake {player.believed_role} ({player.player_name}). Who do they poison?"
-        print(prompt)
-        target = game.get_player_by_name() 
+    async def act(self, player: Player, game: GameManager) -> None:
+        user_sel = await game.command_cog.dmpoll(player.player_name, "Who do you want to poision?", [player.player_name for player in game.players_alive], 1)
+        if user_sel == None: raise ValueError("Selection Returned None")
+        target_name: str = user_sel[0]
+        target = game.get_player_by_name(target_name) 
         target.poisoned = True
         print(f"Put {player.believed_role} to sleep.")
+        await game.command_cog.send_direct_message(player.player_name,game.get_board_str())
 
 @register_role(RoleName.SPY)
 class SpyBehavior(RoleBehavior):
     first_night_priority = 2
     other_night_priority = 3
 
-    def act(self, player: Player, game: GameManager) -> None:
+    async def act(self, player: Player, game: GameManager) -> None:
         prompt = f"\nWake {player.believed_role} ({player.player_name}). Show them the Grimoire. Put to sleep."
         print(prompt)
 
@@ -34,7 +36,7 @@ class SpyBehavior(RoleBehavior):
 class ScarletWomanBehavior(RoleBehavior):
     other_night_priority = 4
 
-    def act(self, player: Player, game: GameManager) -> None:
+    async def act(self, player: Player, game: GameManager) -> None:
         imp = game.get_player_by_role(RoleName.IMP)
         alive_players = sum(1 for p in game.players if p.alive)
         

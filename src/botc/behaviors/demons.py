@@ -3,7 +3,7 @@ from __future__ import annotations       # 1. Add this!
 from typing import TYPE_CHECKING         # 2. Add this!
 if TYPE_CHECKING:                        # 3. Add this block!
     from botc.player import Player
-    from botc.game import GameManager
+    from botc.core.game import GameManager
 
 from botc.enums import RoleName
 from .base import RoleBehavior
@@ -14,7 +14,7 @@ from . import register_role
 class ImpBehavior(RoleBehavior):
     other_night_priority = 5
 
-    def act(self, player: Player, game: GameManager) -> None:
+    async def act(self, player: Player, game: GameManager) -> None:
         prompt = f"\nWake {player.believed_role} ({player.player_name}). Who do they kill?"
         print(prompt)
         target = game.get_player_by_name()

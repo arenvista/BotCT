@@ -49,7 +49,6 @@ class GameManager:
         self.bot = BotManager(self)
         self.poll_manager = PollManager(self)
         self.command_cog = GameCommands(self.bot, self)
-
     def reset_vote_table(self):
         self.vote_table = {
             voter: {candidate: 0 for candidate in self.player_names}
@@ -104,21 +103,22 @@ class GameManager:
         return assigned_players
 
     async def start_game(self, interaction: discord.Interaction):
-        self.roles_distribution = RoleDistributor(self.player_names)
-        self.players = self.assign_roles()
+        # self.roles_distribution = RoleDistributor(self.player_names)
+        # self.players = self.assign_roles()
+        self.players.append(Player("@iiiii5184",RoleName.POISONER, RoleName.POISONER, RoleName.POISONER, Alignment.EVIL))
         self.players_alive = self.players
 
         await self.message_roles_to_players()
 
         for player in self.get_wake_order(is_first_night=True):
-            player.take_action(self)
+            await player.take_action(self)
 
         while(self.game_over != True):
             self.night_counter+=1
             await self.start_voting_phase(interaction)
             self.day_counter+=1
             for player in self.get_wake_order(is_first_night=False):
-                player.take_action(self)
+                await player.take_action(self)
 
     async def message_roles_to_players(self):
         for player in self.players:
@@ -180,7 +180,7 @@ class GameManager:
         return [p for priority, p in waking_players]
 
     def get_board_str(self) -> str:
-        output_str = "\n" + "="*55 + "\n"
+        output_str = "```\n" + "="*55 + "\n"
         for i, player in enumerate(self.players):
             status = "Alive" if player.alive else "DEAD"
             poison_str = " [POISONED]" if player.poisoned else ""
@@ -194,5 +194,5 @@ class GameManager:
                 role_info = f"{player.actual_role} ({player.registered_alignment})"
 
             output_str += f"Seat {i+1:02d} | {player.player_name:<8} | {status:<5} | {role_info}{poison_str}{protect_str}\n"
-        output_str += "="*55 + "\n"
+        output_str += "="*55 + "\n```"
         return output_str
