@@ -21,68 +21,51 @@ class WasherwomanBehavior(RoleBehavior):
     first_night_priority = 3
     
     async def act(self, player: Player, game: GameManager):
-        # 1. FIXED: Added 'not' so Drunk/Poisoned = False
         is_reliable: bool = not (player.actual_role == RoleName.DRUNK or player.poisoned)
-        
         selected_players: List[str] = []
         role_to_reveal: str = ""
         
-        if is_reliable: # --- REGULAR WASHERWOMAN ---
-            # FIXED: Prompt text updated to reflect Regular Washerwoman
-            gm_skip = await game.command_cog.dmdropdown(game.game_master, "Skip Manual Entry for Washerwoman?", ["Yes", "No"], 1)
+        # 1. ONE-LINE GM PROMPT
+        wants_manual = await self.check_gm_override(game, player)
 
-            # Generate random fallback info first
-            # FIXED: Washerwoman can no longer see themselves as the Townsfolk
+        # 2. DETERMINE INFORMATION
+        if is_reliable: # --- REGULAR WASHERWOMAN ---
+            # Default Data
             valid_townsfolk = [p for p in game.players if p.registered_role.role_class == RoleClass.TOWNSFOLK and p != player]
             townsfolk_to_reveal = random.choice(valid_townsfolk)
-            
             valid_others = [p for p in game.players if p != townsfolk_to_reveal and p != player]
-            other_player = random.choice(valid_others)
             
-            selected_players = [townsfolk_to_reveal.player_name, other_player.player_name]
+            selected_players = [townsfolk_to_reveal.player_name, random.choice(valid_others).player_name]
             role_to_reveal = townsfolk_to_reveal.registered_role.__str__()
             
-            # If GM wants to manual override:
-            if game.game_master != "" and gm_skip is not None and gm_skip[0] == "No":
+            # Optional Override
+            if wants_manual:
                 gm_sel_town = await game.modify_information("Select a Townsfolk to reveal", [p.player_name for p in valid_townsfolk], 1)
+                actual_town = gm_sel_town[0] if gm_sel_town else selected_players[0]
                 
-                # Ensure valid string returned, otherwise keep the random fallback
-                actual_town_name = gm_sel_town[0] if gm_sel_town else townsfolk_to_reveal.player_name
+                gm_sel_other = await game.modify_information("Select the 'wrong' player", [p.player_name for p in game.players if p.player_name != actual_town and p != player], 1)
+                actual_other = gm_sel_other[0] if gm_sel_other else selected_players[1]
                 
-                gm_sel_other = await game.modify_information("Select the 'wrong' player", [p.player_name for p in game.players if p.player_name != actual_town_name and p != player], 1)
-                actual_other_name = gm_sel_other[0] if gm_sel_other else other_player.player_name
-                
-                # FIXED: Actually apply the GM's choices to the selected_players list
-                selected_players = [actual_town_name, actual_other_name]
-                
-                # Update the role string to match the GM's new townsfolk target
-                target_obj = game.get_player_by_name(actual_town_name)
-                role_to_reveal = target_obj.registered_role.__str__()
+                selected_players = [actual_town, actual_other]
+                role_to_reveal = game.get_player_by_name(actual_town).registered_role.__str__()
                 
         else: # --- DRUNK / POISONED WASHERWOMAN ---
-            gm_skip = await game.command_cog.dmdropdown(game.game_master, "Skip Manual Entry for Drunk/Poisoned Washerwoman?", ["Yes", "No"], 1)
-            
-            # FIXED: Generate random fake info just in case the GM skips or times out
-            random_two = random.sample([p for p in game.players if p != player], 2)
-            selected_players = [p.player_name for p in random_two]
-            
-            # FIXED: Added GameManager. reference to ROLES_TOWNSFOLK
+            # Default Data
+            selected_players = [p.player_name for p in random.sample([p for p in game.players if p != player], 2)]
             role_to_reveal = random.choice(game.ROLES_TOWNSFOLK).__str__()
 
-            if game.game_master != "" and gm_skip is not None and gm_skip[0] == "No":
+            # Optional Override
+            if wants_manual:
                 gm_sel_players = await game.modify_information("Select Two People to Reveal (Fake Info)", [p.player_name for p in game.players if p != player], 2)
-                # FIXED: Failsafe gracefully instead of raising ValueError
                 if gm_sel_players and len(gm_sel_players) == 2:
                     selected_players = gm_sel_players
                 
                 gm_sel_role = await game.modify_information("Select a Role to Reveal (Fake Info)", [r.__str__() for r in game.ROLES_TOWNSFOLK], 1)
                 if gm_sel_role:
                     role_to_reveal = gm_sel_role[0]
-                    
-        # FIXED: Shuffle the array so the real Townsfolk isn't always listed first!
+
+        # 3. FINALIZE & SEND
         random.shuffle(selected_players)
-        
-        # Build and send the final message
         message = f"One of {selected_players[0]} and {selected_players[1]} is the {role_to_reveal}."
         await game.command_cog.send_direct_message(player.player_name, message)
 
