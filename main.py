@@ -48,9 +48,20 @@ if __name__ == "__main__":
         os.environ["IMMORTAL"]="1"
     else:
         os.environ["IMMORTAL"]="0"
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+=======
+>>>>>>> 92ee905 (disbale voting)
+=======
+>>>>>>> fd2ddfa (we can log encounter flavor text now)
         
     if args.disable_actions:
         os.environ["ENABLE_ACTIONS"]="0"
     else:
         os.environ["ENABLE_ACTIONS"]="1"
+<<<<<<< HEAD
+=======
+>>>>>>> ff39529 (we can log encounter flavor text now)
+>>>>>>> fd2ddfa (we can log encounter flavor text now)
     main()

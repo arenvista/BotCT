@@ -148,6 +148,7 @@ class GameManager:
         await self.message_roles_to_players()
 
 <<<<<<< HEAD
+<<<<<<< HEAD
         if os.environ["ENABLE_ACTIONS"]=="1":
             for player in self.get_wake_order(is_first_night=True):
                 player.take_action(self)
@@ -158,6 +159,15 @@ class GameManager:
 >>>>>>> 9e59c54 (poiser call on discord working)
 =======
 >>>>>>> 9e59c54 (poiser call on discord working)
+=======
+        for player in self.get_wake_order(is_first_night=True):
+            await player.take_action(self)
+=======
+        if os.environ["ENABLE_ACTIONS"]=="1":
+            for player in self.get_wake_order(is_first_night=True):
+                player.take_action(self)
+>>>>>>> ff39529 (we can log encounter flavor text now)
+>>>>>>> fd2ddfa (we can log encounter flavor text now)
 
         while(self.game_over != True):
             self.night_counter+=1
@@ -168,6 +178,7 @@ class GameManager:
 <<<<<<< HEAD
 <<<<<<< HEAD
             
+<<<<<<< HEAD
             if self.encounter_deck:
                 
                 card=self.encounter_deck.draw_card()
@@ -190,6 +201,22 @@ class GameManager:
 >>>>>>> 9e59c54 (poiser call on discord working)
 =======
 >>>>>>> 9e59c54 (poiser call on discord working)
+=======
+<<<<<<< HEAD
+            for player in self.get_wake_order(is_first_night=False):
+                await player.take_action(self)
+=======
+            if self.encounter_deck:
+                
+                card=self.encounter_deck.draw_card()
+                card.specific_encounter.resolve(self)
+                await interaction.channel.send(card.specific_encounter.flavor_text)
+                
+            if os.environ["ENABLE_ACTIONS"]=="1":
+                for player in self.get_wake_order(is_first_night=False):
+                    player.take_action(self)
+>>>>>>> ff39529 (we can log encounter flavor text now)
+>>>>>>> fd2ddfa (we can log encounter flavor text now)
 
     async def message_roles_to_players(self):
         for player in self.players:
