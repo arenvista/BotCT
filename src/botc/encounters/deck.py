@@ -28,8 +28,13 @@ class Deck: #each game will have one instance of the deck class
         
     def __init__(self,encounter_list: List[Encounter],count_list:List[int]):
         
+<<<<<<< HEAD
         self.unresolved_encounter_card_list:List[EncounterCard]=[]
         self.resolved_encounter_card_list:List[EncounterCard]=[]
+=======
+        self.unresolved_encounter_card_list=[]
+        self.resolved_encounter_card_list=[]
+>>>>>>> b2df120 (renamed)
         for encounter,count in zip(encounter_list,count_list):
             self.unresolved_encounter_card_list.extend([EncounterCard(encounter) for _ in range(count)])
         update_possibilities()
@@ -64,6 +69,7 @@ class Deck: #each game will have one instance of the deck class
         return txt
     
     def __len__(self):
+<<<<<<< HEAD
         return len(self.unresolved_encounter_card_list)+len(self.resolved_encounter_card_list)
     
     def __bool__(self):
@@ -76,3 +82,6 @@ class Deck: #each game will have one instance of the deck class
                 return True
             
         return False
+=======
+        return len(self.unresolved_encounter_card_list)+len(self.resolved_encounter_card_list)
+>>>>>>> b2df120 (renamed)
