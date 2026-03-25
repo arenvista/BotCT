@@ -8,7 +8,11 @@ from botc.enums import Alignment, RoleClass, RoleName
 from botc.player import Player
 from botc.core.distribution import RoleDistributor
 <<<<<<< HEAD
+<<<<<<< HEAD
 from botc.encounters import Deck
+=======
+from botc.events import Deck
+>>>>>>> 88c6482 (resolve temporary conditions)
 =======
 from botc.events import Deck
 >>>>>>> 88c6482 (resolve temporary conditions)
@@ -27,8 +31,13 @@ class GameManager:
     def __init__(self, player_names: List[str] = []):
         self.player_names = player_names
 <<<<<<< HEAD
+<<<<<<< HEAD
         self.encounter_interval=1 #how frequently to do an event, hardcoded for now
         self.encounter_deck=Deck.from_json("default")
+=======
+        self.event_interval=1 #how frequently to do an event, hardcoded for now
+        self.event_deck=Deck.from_json("default")
+>>>>>>> 88c6482 (resolve temporary conditions)
 =======
         self.event_interval=1 #how frequently to do an event, hardcoded for now
         self.event_deck=Deck.from_json("default")
@@ -157,6 +166,7 @@ class GameManager:
             self.day_counter+=1
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
             
             if self.encounter_deck:
                 
@@ -168,6 +178,9 @@ class GameManager:
                 for player in self.get_wake_order(is_first_night=False):
                     player.take_action(self)
 =======
+=======
+            
+>>>>>>> 88c6482 (resolve temporary conditions)
 =======
             
 >>>>>>> 88c6482 (resolve temporary conditions)
