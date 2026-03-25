@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from botc.enums import Alignment, RoleClass, RoleName
 from botc.player import Player
 from botc.core.distribution import RoleDistributor
-from botc.events import Deck
+from botc.encounters import Deck
 
 # Import Discord components
 from botc.discord_manager.bot import BotManager
@@ -127,8 +127,12 @@ class GameManager:
 
         while(self.game_over != True):
             self.night_counter+=1
+            self.resolve_temporary_conditions()
             await self.start_voting_phase(interaction)
             self.day_counter+=1
+            
+            if self.event_deck:
+                card=self.event_deck.draw_card()
             
             for player in self.get_wake_order(is_first_night=False):
                 await player.take_action(self)
