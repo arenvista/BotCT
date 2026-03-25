@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from botc.enums import Alignment, RoleClass, RoleName
 from botc.player import Player
 from botc.core.distribution import RoleDistributor
-from botc.events import Deck
+from botc.encounters import Deck
 
 # Import Discord components
 from botc.discord_manager.bot import BotManager
@@ -22,8 +22,8 @@ class GameManager:
 
     def __init__(self, player_names: List[str] = []):
         self.player_names = player_names
-        self.event_interval=1 #how frequently to do an event, hardcoded for now
-        self.event_deck=Deck.from_json("default")
+        self.encounter_interval=1 #how frequently to do an event, hardcoded for now
+        self.encounter_deck=Deck.from_json("default")
         
         if self.player_names:
             self.roles_distribution = RoleDistributor(self.player_names)
