@@ -1,5 +1,5 @@
 import botc.events
-from botc.events import simple,deck,EVENT_MAP
+from botc.events import simple,deck,EVENT_MAP,Deck
 from botc.events.base import reset_resolved
 import pytest
 
@@ -42,3 +42,7 @@ def test_deck():
     card=my_deck.draw_card()
     with pytest.raises(IndexError):
         card=my_deck.draw_card()    
+        
+def test_deck_from_json():
+    d=Deck.from_json("default.json")
+    d.draw_card()

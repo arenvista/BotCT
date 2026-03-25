@@ -1,6 +1,8 @@
-from .base import Event,update_possibilities
+from .base import Event,update_possibilities,EVENT_MAP
 from typing import List
 import random
+import json
+from importlib import resources
     
 class EventCard: #multiple event cards can correspond to the same event; 
     #that way different events can happen with different rarities
@@ -9,6 +11,21 @@ class EventCard: #multiple event cards can correspond to the same event;
         self.specific_event=specific_event
         
 class Deck: #each game will have one instance of the deck class
+    
+    @classmethod
+    def from_json(cls,json_file_name):
+        if not json_file_name.endswith(".json"):
+            json_file_name+=".json"
+        with resources.files("botc.decklists").joinpath(json_file_name).open("r") as f:
+            json_object=json.load(f)
+            count_list=json_object["count_list"]
+            event_name_list=json_object["event_name_list"]
+        return cls(
+            [EVENT_MAP[n] for n in event_name_list],
+            [c for c in count_list]
+        )
+            
+        
     def __init__(self,event_list: List[Event],count_list:List[int]):
         
         self.unresolved_event_card_list=[]
