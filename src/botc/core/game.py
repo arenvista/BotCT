@@ -61,10 +61,13 @@ class GameManager:
         self.bot = BotManager(self)
         self.poll_manager = PollManager(self)
         self.command_cog = GameCommands(self.bot, self)
+<<<<<<< HEAD
 
     async def modify_information(self, message: str, choices: List[str], max_input: int):
         return await self.command_cog.dmpoll(self.game_master, message, choices, max_input)
 
+=======
+>>>>>>> 9e59c54 (poiser call on discord working)
     def reset_vote_table(self):
         self.vote_table = {
             voter: {candidate: 0 for candidate in self.player_names}
@@ -126,7 +129,11 @@ class GameManager:
     async def start_game(self, interaction: discord.Interaction):
         # self.roles_distribution = RoleDistributor(self.player_names)
         # self.players = self.assign_roles()
+<<<<<<< HEAD
         self.players.append(Player("@iiiii5184",RoleName.WASHERWOMAN, RoleName.WASHERWOMAN, RoleName.WASHERWOMAN, Alignment.GOOD))
+=======
+        self.players.append(Player("@iiiii5184",RoleName.POISONER, RoleName.POISONER, RoleName.POISONER, Alignment.EVIL))
+>>>>>>> 9e59c54 (poiser call on discord working)
         self.players_alive = self.players
 
         await self.message_roles_to_players()
@@ -138,6 +145,9 @@ class GameManager:
 =======
         for player in self.get_wake_order(is_first_night=True):
             await player.take_action(self)
+<<<<<<< HEAD
+>>>>>>> 9e59c54 (poiser call on discord working)
+=======
 >>>>>>> 9e59c54 (poiser call on discord working)
 
         while(self.game_over != True):
@@ -163,6 +173,9 @@ class GameManager:
 >>>>>>> 88c6482 (resolve temporary conditions)
             for player in self.get_wake_order(is_first_night=False):
                 await player.take_action(self)
+<<<<<<< HEAD
+>>>>>>> 9e59c54 (poiser call on discord working)
+=======
 >>>>>>> 9e59c54 (poiser call on discord working)
 
     async def message_roles_to_players(self):

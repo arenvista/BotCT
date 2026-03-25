@@ -19,11 +19,16 @@ ROLES_TOWNSFOLK = RoleName.get_by_class(RoleClass.TOWNSFOLK)
 @register_role(RoleName.WASHERWOMAN)
 class WasherwomanBehavior(RoleBehavior):
     first_night_priority = 3
+<<<<<<< HEAD
     
     async def act(self, player: Player, game: GameManager):
         # 1. FIXED: Added 'not' so Drunk/Poisoned = False
         is_reliable: bool = not (player.actual_role == RoleName.DRUNK or player.poisoned)
         
+=======
+    async def act(self, player: Player, game: GameManager):
+        is_reliable: bool = player.actual_role == RoleName.DRUNK or player.poisoned
+>>>>>>> 9e59c54 (poiser call on discord working)
         selected_players: List[str] = []
         role_to_reveal: str = ""
         

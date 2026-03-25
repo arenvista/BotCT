@@ -1,9 +1,12 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING, List, Optional
 
 import discord
 from discord.ext import commands
 from discord import app_commands
+import datetime
+import asyncio
 import datetime
 import asyncio
 
@@ -63,6 +66,91 @@ class GameCommands(commands.Cog):
     async def dmpoll(self, user_name: str, poll_message: str, poll_options: List[str], max_selection: int) -> Optional[List[str]]:
         if len(poll_options) > 10 or max_selection == 1:
             return await self.dmdropdown(user_name, poll_message, poll_options, max_selection)
+        
+        # 1. Fetch user safely using their string username
+        clean_name: str = user_name.lstrip('@').lower()
+        
+        user: discord.User | None = discord.utils.find(
+            lambda u: u.name.lower() == clean_name or (u.global_name and u.global_name.lower() == clean_name), 
+            self.bot.users
+        )
+        
+        if user is None:
+            print(f"❌ Could not find user with name '{user_name}' in cache.")
+            return None
+
+        allow_multiple = max_selection > 1
+
+        poll = discord.Poll(
+            question=f"{poll_message} (Select up to {max_selection})",
+            duration=datetime.timedelta(hours=1),
+            multiple=allow_multiple 
+        )
+
+        for option in poll_options[:10]:
+            poll.add_answer(text=option)
+
+        try:
+            message: discord.Message = await user.send(poll=poll)
+        except (discord.Forbidden, discord.HTTPException):
+            return None
+
+        # --- Safe Polling Loop ---
+        timeout = 3600  # Give up after 1 hour if they never vote
+        poll_interval = 2.0  # Check for votes every 2 seconds
+        elapsed = 0.0
+        live_message = message
+
+        while elapsed < timeout:
+            await asyncio.sleep(poll_interval)
+            elapsed += poll_interval
+            
+            try:
+                live_message = await message.channel.fetch_message(message.id)
+            except discord.HTTPException:
+                continue # If Discord hiccups, try again next loop
+                
+            if live_message.poll is None:
+                raise ValueError("Poll Returned Message.Poll == None")
+                
+            selected_count = sum(1 for answer in live_message.poll.answers if answer.vote_count > 0)
+            
+            if selected_count > 0:
+                if allow_multiple:
+                    await asyncio.sleep(3) 
+                    live_message = await message.channel.fetch_message(message.id)
+                    if live_message.poll is None: continue
+                    selected_count = sum(1 for answer in live_message.poll.answers if answer.vote_count > 0)
+                break 
+        else:
+            return None
+
+        # --- Validation & Recursion ---
+        if selected_count > max_selection:
+            await live_message.end_poll() 
+            await user.send(f"⚠️ **Oops!** You selected {selected_count} options, but the limit is {max_selection}. Let's try again.")
+            # Note: Updated recursion call to use user_name
+            return await self.dmpoll(user_name, poll_message, poll_options, max_selection)
+            
+        # --- Close the poll upon valid selection ---
+        try:
+            await live_message.end_poll()
+        except discord.HTTPException:
+            pass 
+            
+        selected_choices: List[str] = []
+        
+        if live_message.poll: 
+            for answer in live_message.poll.answers:
+                if answer.vote_count > 0:
+                    selected_choices.append(answer.text)
+                
+        return selected_choices
+
+    # CHANGED: Now accepts user_name (str)
+    async def dmpoll(self, user_name: str, poll_message: str, poll_options: List[str], max_selection: int) -> Optional[List[str]]:
+        if len(poll_options) > 10:
+            raise ValueError("Poll Must be <= 10")
         
         # 1. Fetch user safely using their string username
         clean_name: str = user_name.lstrip('@').lower()

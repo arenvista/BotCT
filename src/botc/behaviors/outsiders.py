@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:                        
     from botc.player import Player
     from botc.core.game import GameManager
+    from botc.core.game import GameManager
 
 
 from botc.enums import RoleName
