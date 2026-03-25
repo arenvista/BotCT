@@ -1,12 +1,12 @@
 from . import base,deck,simple
-from .base import EVENT_MAP,update_possibilities
+from .base import ENCOUNTER_MAP,update_possibilities
 
-for key,value in EVENT_MAP.items():
+for key,value in ENCOUNTER_MAP.items():
     for dep_name in value.dependency_names:
-        value.dependencies.append(EVENT_MAP[dep_name])
+        value.dependencies.append(ENCOUNTER_MAP[dep_name])
         
     for antidep_name in value.anti_dependency_names:
-        value.anti_dependencies.append(EVENT_MAP[antidep_name])
+        value.anti_dependencies.append(ENCOUNTER_MAP[antidep_name])
 update_possibilities()     
 from .deck import Deck
 '''
