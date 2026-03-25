@@ -28,8 +28,8 @@ class Deck: #each game will have one instance of the deck class
         
     def __init__(self,encounter_list: List[Encounter],count_list:List[int]):
         
-        self.unresolved_encounter_card_list=[]
-        self.resolved_encounter_card_list=[]
+        self.unresolved_encounter_card_list:List[EncounterCard]=[]
+        self.resolved_encounter_card_list:List[EncounterCard]=[]
         for encounter,count in zip(encounter_list,count_list):
             self.unresolved_encounter_card_list.extend([EncounterCard(encounter) for _ in range(count)])
         update_possibilities()
@@ -65,3 +65,14 @@ class Deck: #each game will have one instance of the deck class
     
     def __len__(self):
         return len(self.unresolved_encounter_card_list)+len(self.resolved_encounter_card_list)
+    
+    def __bool__(self):
+        
+        if len(self.unresolved_encounter_card_list)==0:
+            return False
+        
+        for card in self.unresolved_encounter_card_list:
+            if card.specific_encounter:
+                return True
+            
+        return False

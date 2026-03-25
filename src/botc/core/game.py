@@ -118,16 +118,25 @@ class GameManager:
 
         await self.message_roles_to_players()
 
-        for player in self.get_wake_order(is_first_night=True):
-            player.take_action(self)
+        if os.environ["ENABLE_ACTIONS"]=="1":
+            for player in self.get_wake_order(is_first_night=True):
+                player.take_action(self)
 
         while(self.game_over != True):
             self.night_counter+=1
-            await self.start_voting_phase(interaction)
+            if os.environ["VOTING"]=="1":
+                await self.start_voting_phase(interaction)
             self.day_counter+=1
             
-            for player in self.get_wake_order(is_first_night=False):
-                player.take_action(self)
+            if self.encounter_deck:
+                
+                card=self.encounter_deck.draw_card()
+                card.specific_encounter.resolve(self)
+                await interaction.channel.send(card.specific_encounter.flavor_text)
+                
+            if os.environ["ENABLE_ACTIONS"]=="1":
+                for player in self.get_wake_order(is_first_night=False):
+                    player.take_action(self)
 
     async def message_roles_to_players(self):
         for player in self.players:
