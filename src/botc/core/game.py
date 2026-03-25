@@ -7,7 +7,11 @@ from dotenv import load_dotenv
 from botc.enums import Alignment, RoleClass, RoleName
 from botc.player import Player
 from botc.core.distribution import RoleDistributor
+<<<<<<< HEAD
 from botc.encounters import Deck
+=======
+from botc.events import Deck
+>>>>>>> 88c6482 (resolve temporary conditions)
 
 # Import Discord components
 from botc.discord_manager.bot import BotManager
@@ -22,8 +26,13 @@ class GameManager:
 
     def __init__(self, player_names: List[str] = []):
         self.player_names = player_names
+<<<<<<< HEAD
         self.encounter_interval=1 #how frequently to do an event, hardcoded for now
         self.encounter_deck=Deck.from_json("default")
+=======
+        self.event_interval=1 #how frequently to do an event, hardcoded for now
+        self.event_deck=Deck.from_json("default")
+>>>>>>> 88c6482 (resolve temporary conditions)
         
         if self.player_names:
             self.roles_distribution = RoleDistributor(self.player_names)
@@ -137,6 +146,7 @@ class GameManager:
                 await self.start_voting_phase(interaction)
             self.day_counter+=1
 <<<<<<< HEAD
+<<<<<<< HEAD
             
             if self.encounter_deck:
                 
@@ -148,6 +158,9 @@ class GameManager:
                 for player in self.get_wake_order(is_first_night=False):
                     player.take_action(self)
 =======
+=======
+            
+>>>>>>> 88c6482 (resolve temporary conditions)
             for player in self.get_wake_order(is_first_night=False):
                 await player.take_action(self)
 >>>>>>> 9e59c54 (poiser call on discord working)
