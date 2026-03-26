@@ -121,11 +121,11 @@ class AngryWizardEncounter(Encounter):
             if player.registered_alignment==Alignment.GOOD:
                 if random.random()<0.1 and not player.protected: #10% probability of getting murdered
                     player.alive=False
-                    game.command_cog.send_direct_message(player.player_name,f" Fireball straight to the torso. You burn alive and are now dead ")
+                    await game.command_cog.send_direct_message(player.player_name,f" Fireball straight to the torso. You burn alive and are now dead ")
                 else:
-                    game.command_cog.send_direct_message(player.player_name,f" You narrowly escape immolation  ")
+                    await game.command_cog.send_direct_message(player.player_name,f" You narrowly escape immolation  ")
             else:
-                game.command_cog.send_direct_message(player.player_name,f" The wizard senses your malevolence, and spares you to enact further cruelty upon the town  ")
+                await game.command_cog.send_direct_message(player.player_name,f" The wizard senses your malevolence, and spares you to enact further cruelty upon the town  ")
                     
         
 @register_encounter(WIZARD_COME,[],[WIZARD_COME],
@@ -145,10 +145,10 @@ class WizardEncounter(Encounter):
             
         if votes[WIZARD_YES]>=votes[WIZARD_NO]:
             game.event_deck.remove_all_cards(ENCOUNTER_MAP[ANGRY_WIZARD])
-            interaction.channel.send("He reveals himself to be the Wizard Merlin, and is impressed by your friendliness")
+            await interaction.channel.send("He reveals himself to be the Wizard Merlin, and is impressed by your friendliness")
         else:
             game.event_deck.remove_all_cards(ENCOUNTER_MAP[HAPPY_WIZARD])
-            interaction.channel.send("He reveals himself to be the Wizard Merlin, and is angered by your hostility")
+            await interaction.channel.send("He reveals himself to be the Wizard Merlin, and is angered by your hostility")
 
         
 @register_encounter(HAPPY_WIZARD,[WIZARD_COME],[HAPPY_WIZARD,ANGRY_WIZARD],
@@ -166,5 +166,5 @@ class HappyWizardEncounter(Encounter):
             
         target=random.choice(game.players)
         
-        game.command_cog.send_direct_message(target.player_name,f"The wizard warns you that he felt nefarious, infernal energy coming from on of {pair[0]} or {pair[1]}, but isnt sure which one")
+        await game.command_cog.send_direct_message(target.player_name,f"The wizard warns you that he felt nefarious, infernal energy coming from on of {pair[0].player_name} or {pair[1].player_name}, but isnt sure which one")
             

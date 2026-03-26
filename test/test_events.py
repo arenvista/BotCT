@@ -4,6 +4,7 @@ from botc.encounters.enums import *
 from botc.encounters.base import reset_resolved
 from botc.core.game import GameManager
 from botc.behaviors.base import RoleBehavior,RoleName
+from botc.behaviors import BEHAVIOR_MAP
 from botc.enums import Status,Alignment
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
@@ -11,6 +12,7 @@ from botc.discord_manager import PollManager
 from botc.player import Player
 from botc.discord_manager.cogs.game_commands import GameCommands
 import discord
+import os
 import pytest
 
 
@@ -64,11 +66,16 @@ def async_pair(monkeypatch):
         channel=SimpleNamespace(send=AsyncMock())
     )
     
+    os.environ["ENCOUNTER"]="1"
+    
     
     async def mock_nothing(*args,**kwargs):
         return
-    monkeypatch.setattr(RoleBehavior,"act",mock_nothing)
+    
+    for v in BEHAVIOR_MAP.values():
+        monkeypatch.setattr(v,"act",mock_nothing) #act is an abstract method so we have to monkey patch each individual subclass
     monkeypatch.setattr(PollManager,"run_execution_poll",mock_nothing)
+    
     #monkeypatch.setattr(GameCommands,"send_direct_message",mock_nothing)
     
     def get_mock_resolve_temporary_conditions(counter):
@@ -93,11 +100,11 @@ async def test_wizard_happy(async_pair,monkeypatch):
     players.append(Player("demon",RoleName.IMP,RoleName.IMP,Alignment.EVIL))
     
     game=GameManager([p.player_name for p in players])
-    game.players=players
+    monkeypatch.setattr(game, "assign_roles",lambda *args: players)
     
-    game.event_deck=Deck([ENCOUNTER_MAP[WIZARD_COME],ENCOUNTER_MAP[ANGRY_WIZARD]],[1,1,1])
+    game.event_deck=Deck([ENCOUNTER_MAP[WIZARD_COME],ENCOUNTER_MAP[HAPPY_WIZARD], ENCOUNTER_MAP[ANGRY_WIZARD]],[1,1,1])
     
-    monkeypatch.setattr(game.command_cog,"dmdropdown",AsyncMock(side_effect=[WIZARD_YES]))
+    monkeypatch.setattr(game.command_cog,"dmdropdown",AsyncMock(side_effect=lambda *args: [WIZARD_YES]))
     
     message_queue=[]
     async def mock_direct_message(user_name: str, message: str):
@@ -107,11 +114,39 @@ async def test_wizard_happy(async_pair,monkeypatch):
     
     monkeypatch.setattr(game.command_cog,"send_direct_message",mock_direct_message)
     
-    game.start_game(interaction)
+    await game.start_game(interaction)
     
+    last_message=message_queue[-1][-1]
     
+    assert "demon" in last_message
     
+@pytest.mark.asyncio
+async def test_wizard_angry(async_pair,monkeypatch):
+    interaction,get_mock_resolve_temporary_conditions=async_pair
+    monkeypatch.setattr(GameManager,"resolve_temporary_conditions",get_mock_resolve_temporary_conditions(2)) #how many nights we're doing this for
     
+    players=[Player(f"p_{n}",RoleName.WASHERWOMAN,RoleName.WASHERWOMAN,Alignment.GOOD) for n in range(5)]
+    players.append(Player("soldier",RoleName.SOLDIER,RoleName.SOLDIER,Alignment.GOOD))
+    players.append(Player("demon",RoleName.IMP,RoleName.IMP,Alignment.EVIL))
     
+    game=GameManager([p.player_name for p in players])
+    monkeypatch.setattr(game, "assign_roles",lambda *args: players)
     
-    # self.command_cog.send_direct_message
+    game.event_deck=Deck([ENCOUNTER_MAP[WIZARD_COME],ENCOUNTER_MAP[HAPPY_WIZARD], ENCOUNTER_MAP[ANGRY_WIZARD]],[1,1,1])
+    
+    monkeypatch.setattr(game.command_cog,"dmdropdown",AsyncMock(side_effect=lambda *args: [WIZARD_NO]))
+    
+    message_queue=[]
+    async def mock_direct_message(user_name: str, message: str):
+        nonlocal message_queue
+        message_queue.append([user_name,message])
+        return True
+    
+    monkeypatch.setattr(game.command_cog,"send_direct_message",mock_direct_message)
+    
+    await game.start_game(interaction)
+    
+    for [name,message] in message_queue[::-1]:
+        if name =="demon":
+            assert message.find("he wizard senses your malevolence")!=-1
+            break

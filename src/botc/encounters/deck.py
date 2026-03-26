@@ -32,7 +32,7 @@ class Deck: #each game will have one instance of the deck class
         update_possibilities()
     
     def remove_all_cards(self,enc:Encounter):
-        self.resolved_encounter_card_list =[c for c in self.resolved_encounter_card_list if c.specific_encounter!=enc]
+        self.unresolved_encounter_card_list =[c for c in self.unresolved_encounter_card_list if c.specific_encounter!=enc]
     
     def draw_card(self)-> EncounterCard:
         indices=[c for c,card in enumerate(self.unresolved_encounter_card_list) if (card.specific_encounter.parents_resolved and (card.specific_encounter.impossible==False))]
