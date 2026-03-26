@@ -16,62 +16,68 @@ class PollManager:
     def __init__(self, game: GameManager) -> None:
         self.game: GameManager = game
 
-    async def run_gamemaster_poll(self, interaction: discord.Interaction, player_names: List[str]):
+    async def run_gamemaster_poll(self, interaction: discord.Interaction) -> str:
         """
-        Conducts a poll to select the Game Master.
+        Conducts a poll asking who wants to be GM. 
+        Randomly selects one person who said 'Yes'.
         """
-        # Filter candidate list to exclude the bot itself
-        candidates = [name for name in player_names if name.lower() != self.game.bot.user.name.lower()]
-        
-        if not candidates:
-            # Fallback if no valid candidates exist
-            self.game.game_master = interaction.user.name
-            await interaction.followup.send(f"⚠️ No candidates found. {interaction.user.name} has been assigned as GM.")
-            return
-
-        # FIX: Use datetime.timedelta and pass the duration (not a timestamp)
+        # 1. Create the Poll
+        # NOTE: Answers are passed as a list of PollAnswer objects or dicts
         poll = discord.Poll(
-            question="Who should be the Game Master?",
-            duration=datetime.timedelta(minutes=2),
-            multiple=False
+            question="Would you like to be the Game Master?",
+            duration=datetime.timedelta(hours=1), # Discord prefers hour increments; 1 is the minimum for some versions
         )
+        
+        # Correct way to add answers in newer discord.py versions:
+        poll.add_answer(text="Yes", emoji="✅")
+        poll.add_answer(text="No", emoji="❌")
 
-        for name in candidates[:10]:  # Discord polls are limited to 10 options
-            poll.add_answer(text=name)
-
-        # Use followup.send because the interaction was likely already responded to
         try:
+            # Use followup.send(poll=poll)
             poll_message = await interaction.followup.send(
-                content="📊 **Please vote for your Game Master!** The poll will close in 2 minutes.",
+                content="📊 **GM Selection:** Please vote 'Yes' if you are interested in being the Game Master.",
                 poll=poll
             )
         except discord.HTTPException as e:
-            print(f"Failed to send poll: {e}")
-            return
+            print(f"Failed to send poll: {e.text}") # .text gives more detail on the 'Invalid Form Body'
+            return ""
 
-        # Wait for the poll duration
+        # 2. Wait for the poll to finish 
+        # For testing, we wait 120s, then manually end it because minimum duration is usually higher
         await asyncio.sleep(120)
 
-        # Refresh message to get latest poll results and end it manually if needed
+        # 3. Finalize and fetch results
         try:
-            poll_message = await poll_message.channel.fetch_message(poll_message.id)
-            if poll_message.poll and not poll_message.poll.is_finalised:
+            # Refresh the message to get the latest poll state
+            poll_message = await interaction.channel.fetch_message(poll_message.id)
+            
+            if not poll_message.poll.is_finalised:
                 await poll_message.end_poll()
+                # Re-fetch after ending to get final counts
+                poll_message = await interaction.channel.fetch_message(poll_message.id)
         except discord.HTTPException:
-            pass
+            return ""
 
-        # Calculate winner
-        winner_name = candidates[0] # Default to first player
-        max_votes = -1
+        # 4. Identify the "Yes" voters
+        yes_voters = []
+        
+        # Find the specific answer for "Yes"
+        yes_answer = discord.utils.get(poll_message.poll.answers, text="Yes")
 
-        if poll_message.poll:
-            for answer in poll_message.poll.answers:
-                if answer.vote_count > max_votes:
-                    max_votes = answer.vote_count
-                    winner_name = answer.text
+        if yes_answer:
+            # Fetch the users who voted for this specific answer
+            async for user in yes_answer.voters():
+                if not user.bot:
+                    yes_voters.append(user.display_name)
 
-        self.game.game_master = winner_name
-        await interaction.followup.send(f"👑 **{winner_name}** has been elected as the Game Master!")
+        # 5. Random Selection
+        if yes_voters:
+            selected_gm = random.choice(yes_voters)
+            await interaction.followup.send(f"👑 **{selected_gm}** has been randomly selected as the Game Master!")
+            return selected_gm
+        
+        await interaction.followup.send("⚠️ No one volunteered to be the Game Master.")
+        return ""
 
     async def run_execution_poll(self, interaction: discord.Interaction, allowed_player_ids: list[str]) -> Optional[discord.Message]:
         if not isinstance(interaction.channel, discord.TextChannel):

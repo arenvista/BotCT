@@ -257,15 +257,19 @@ class GameCommands(commands.Cog):
     async def start_game(self, interaction: discord.Interaction) -> None:
         ROLES_DEMONS = RoleName.get_by_class(RoleClass.DEMONS)
         ROLES_MINIONS = RoleName.get_by_class(RoleClass.MINIONS)
-        ROLES_MINIONS.remove(RoleName.POISONER)
         ROLES_OUTSIDERS = RoleName.get_by_class(RoleClass.OUTSIDERS)
         ROLES_TOWNSFOLK = RoleName.get_by_class(RoleClass.TOWNSFOLK)
         # Testing End Start
         targets = ROLES_DEMONS + ROLES_MINIONS + ROLES_OUTSIDERS + ROLES_TOWNSFOLK
         for r in targets:
             self.game.players.append(Player("iiiii5184", r, r, Alignment.GOOD))
-        # Testing End
 
+        targets = ROLES_MINIONS + ROLES_OUTSIDERS + ROLES_TOWNSFOLK
+        counter = 0
+        for r in targets:
+            counter+=1
+            self.game.players.append(Player(f"Test{counter}", r, r, Alignment.GOOD))
+        # Testing End
         num_players: int = len(self.game.player_names)
         
         if num_players < 0: 
@@ -274,7 +278,7 @@ class GameCommands(commands.Cog):
             
         await interaction.response.send_message("🚀 **The lobby is closed!** Starting GM Poll...")
         poll: PollManager = PollManager(self.game)
-        await poll.run_gamemaster_poll(interaction, self.game.player_names)
+        self.game.game_master = await poll.run_gamemaster_poll(interaction)
         await self.game.start_game(interaction)
         
     @app_commands.command(name="display_players", description="Show the current players in the game!")
