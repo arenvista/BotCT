@@ -7,6 +7,7 @@ from discord import app_commands
 import datetime
 import asyncio
 import re
+import os
 
 if TYPE_CHECKING:
     from botc.core.game import GameManager
@@ -259,17 +260,20 @@ class GameCommands(commands.Cog):
         ROLES_MINIONS = RoleName.get_by_class(RoleClass.MINIONS)
         ROLES_OUTSIDERS = RoleName.get_by_class(RoleClass.OUTSIDERS)
         ROLES_TOWNSFOLK = RoleName.get_by_class(RoleClass.TOWNSFOLK)
-        # Testing End Start
-        targets = ROLES_DEMONS + ROLES_MINIONS + ROLES_OUTSIDERS + ROLES_TOWNSFOLK
-        for r in targets:
-            self.game.players.append(Player("iiiii5184", r, r, Alignment.GOOD))
+        
+        if os.environ["TESTING"]=="1":
+        
+            # Testing End Start
+            targets = ROLES_DEMONS + ROLES_MINIONS + ROLES_OUTSIDERS + ROLES_TOWNSFOLK
+            for r in targets:
+                self.game.players.append(Player("iiiii5184", r, r, Alignment.GOOD))
 
-        targets = ROLES_MINIONS + ROLES_OUTSIDERS + ROLES_TOWNSFOLK
-        counter = 0
-        for r in targets:
-            counter+=1
-            self.game.players.append(Player(f"Test{counter}", r, r, Alignment.GOOD))
-        # Testing End
+            targets = ROLES_MINIONS + ROLES_OUTSIDERS + ROLES_TOWNSFOLK
+            counter = 0
+            for r in targets:
+                counter+=1
+                self.game.players.append(Player(f"Test{counter}", r, r, Alignment.GOOD))
+            # Testing End
         num_players: int = len(self.game.player_names)
         
         if num_players < 0: 
