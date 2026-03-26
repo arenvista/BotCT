@@ -120,9 +120,33 @@ async def test_wizard_happy(async_pair,monkeypatch):
     
     assert "demon" in last_message
     
+@pytest.mark.asyncio
+async def test_wizard_angry(async_pair,monkeypatch):
+    interaction,get_mock_resolve_temporary_conditions=async_pair
+    monkeypatch.setattr(GameManager,"resolve_temporary_conditions",get_mock_resolve_temporary_conditions(2)) #how many nights we're doing this for
     
+    players=[Player(f"p_{n}",RoleName.WASHERWOMAN,RoleName.WASHERWOMAN,Alignment.GOOD) for n in range(5)]
+    players.append(Player("soldier",RoleName.SOLDIER,RoleName.SOLDIER,Alignment.GOOD))
+    players.append(Player("demon",RoleName.IMP,RoleName.IMP,Alignment.EVIL))
     
+    game=GameManager([p.player_name for p in players])
+    monkeypatch.setattr(game, "assign_roles",lambda *args: players)
     
+    game.event_deck=Deck([ENCOUNTER_MAP[WIZARD_COME],ENCOUNTER_MAP[HAPPY_WIZARD], ENCOUNTER_MAP[ANGRY_WIZARD]],[1,1,1])
     
+    monkeypatch.setattr(game.command_cog,"dmdropdown",AsyncMock(side_effect=lambda *args: [WIZARD_NO]))
     
-    # self.command_cog.send_direct_message
+    message_queue=[]
+    async def mock_direct_message(user_name: str, message: str):
+        nonlocal message_queue
+        message_queue.append([user_name,message])
+        return True
+    
+    monkeypatch.setattr(game.command_cog,"send_direct_message",mock_direct_message)
+    
+    await game.start_game(interaction)
+    
+    for [name,message] in message_queue[::-1]:
+        if name =="demon":
+            assert message.find("he wizard senses your malevolence")!=-1
+            break
