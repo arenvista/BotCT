@@ -22,8 +22,9 @@ class GameManager:
 
     def __init__(self, player_names: List[str] = []):
         self.player_names = player_names
-        self.event_interval=1 #how frequently to do an event, hardcoded for now
-        self.event_deck=Deck.from_json("default")
+        if os.environ["ENCOUNTER"]=="1":
+            self.event_interval=1 #how frequently to do an event, hardcoded for now
+            self.event_deck=Deck.from_json("default")
         
         if self.player_names:
             self.roles_distribution = RoleDistributor(self.player_names)
@@ -132,10 +133,10 @@ class GameManager:
             await self.start_voting_phase(interaction)
             self.day_counter+=1
             
-            # if self.event_deck:
-            #     card=self.event_deck.draw_card()
-            #     await interaction.channel.send(card.specific_encounter.flavor_text) 
-            #     card.specific_encounter.resolve(self)
+            if self.event_deck:
+                card=self.event_deck.draw_card()
+                await interaction.channel.send(card.specific_encounter.flavor_text) 
+                card.specific_encounter.resolve(self)
             
             for player in self.get_wake_order(is_first_night=False):
                 await player.take_action(self)
