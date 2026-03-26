@@ -7,10 +7,10 @@ import random
 ENCOUNTER_MAP={}
 
 
-def register_encounter(encounter_name,dependency_names,anti_dependency_names):
+def register_encounter(encounter_name,dependency_names,anti_dependency_names,display_name:str="",flavor_text:str=""):
     #assigns name to encounter and adds it to encounter map dictionary
     def decorator(cls):
-        encounter_object=cls(encounter_name,dependency_names,anti_dependency_names)
+        encounter_object=cls(encounter_name,dependency_names,anti_dependency_names,display_name,flavor_text)
         ENCOUNTER_MAP[encounter_name] = encounter_object
         return cls
     return decorator
@@ -20,7 +20,7 @@ class Encounter(ABC):
     
     
     
-    def __init__(self,name:str,dependency_names:List[str],anti_dependency_names:List[str]):
+    def __init__(self,name:str,dependency_names:List[str],anti_dependency_names:List[str],display_name:str,flavor_text:str):
         super().__init__()
         self.dependency_names=dependency_names
         self.anti_dependency_names=anti_dependency_names
@@ -31,7 +31,8 @@ class Encounter(ABC):
         self.parents_resolved: bool =False #an encounter is marked possible if all of its dependencies have resolved
         #impossible always takes precedence over impossible
         self.resolved:bool=False #an encounter that has happened has resolved
-        self.flavor_text:str=""
+        self.flavor_text:str=flavor_text
+        self.display_name:str=display_name
         self.image: Image.Image=None #image to render to depict encounter (low priority)
         
     
