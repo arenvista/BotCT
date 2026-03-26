@@ -261,7 +261,7 @@ class GameCommands(commands.Cog):
         ROLES_OUTSIDERS = RoleName.get_by_class(RoleClass.OUTSIDERS)
         ROLES_TOWNSFOLK = RoleName.get_by_class(RoleClass.TOWNSFOLK)
         
-        if os.environ["TESTING"]=="1":
+        if "TESTING" in os.environ and  os.environ["TESTING"]=="1":
         
             # Testing End Start
             targets = ROLES_DEMONS + ROLES_MINIONS + ROLES_OUTSIDERS + ROLES_TOWNSFOLK
