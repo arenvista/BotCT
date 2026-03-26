@@ -15,11 +15,11 @@ class StatusItem:
 
 class Status:
     # We replace the immutable tuples with our mutable StatusItem objects
-    def __init__(self, poisoned: StatusItem, drunk: StatusItem, protected: StatusItem, alive: StatusItem):
-        self.poisoned = StatusItem(False)
-        self.drunk = StatusItem(False)
-        self.protected = StatusItem(False)
-        self.alive = StatusItem(True)
+    def __init__(self, poisoned: StatusItem=None, drunk: StatusItem=None, protected: StatusItem=None, alive: StatusItem=None):
+        self.poisoned = poisoned if poisoned is not None else StatusItem(False)
+        self.drunk = drunk if drunk is not None else StatusItem(False)
+        self.protected = protected if protected is not None else StatusItem(False)
+        self.alive = alive if alive is not None else StatusItem(False)
 
     def is_reliable(self) -> bool:
         return self.poisoned.state == False and self.drunk.state == False
