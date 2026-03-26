@@ -178,8 +178,18 @@ class GameManager:
 <<<<<<< HEAD
 <<<<<<< HEAD
             
+<<<<<<< Updated upstream
 <<<<<<< HEAD
             if self.encounter_deck:
+=======
+            if self.event_deck:
+                card=self.event_deck.draw_card()
+                await interaction.channel.send(card.specific_encounter.flavor_text) 
+                card.specific_encounter.resolve(self)
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
                 
                 card=self.encounter_deck.draw_card()
                 card.specific_encounter.resolve(self)
