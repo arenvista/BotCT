@@ -1,12 +1,16 @@
 import botc.encounters
 from botc.encounters import simple,deck,ENCOUNTER_MAP,Deck
+from botc.encounters.enums import *
 from botc.encounters.base import reset_resolved
 from botc.core.game import GameManager
-from botc.behaviors.base import RoleBehavior
+from botc.behaviors.base import RoleBehavior,RoleName
+from botc.enums import Status,Alignment
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 from botc.discord_manager import PollManager
+from botc.player import Player
 from botc.discord_manager.cogs.game_commands import GameCommands
+import discord
 import pytest
 
 
@@ -65,15 +69,49 @@ def async_pair(monkeypatch):
         return
     monkeypatch.setattr(RoleBehavior,"act",mock_nothing)
     monkeypatch.setattr(PollManager,"run_execution_poll",mock_nothing)
-    monkeypatch.setattr(GameCommands,"send_direct_message",mock_nothing)
+    #monkeypatch.setattr(GameCommands,"send_direct_message",mock_nothing)
     
-    def get_mock_resolve_cond(counter):
-        def _mock_resolve_conditions(self): #mocking this to eventually end the game after n turns
+    def get_mock_resolve_temporary_conditions(counter):
+        def _mock_resolve_temporary_conditions(self): #mocking this to eventually end the game after n turns
             for player in self.players:
                 player.protected=False
                 player.poisoned=False
             if self.day_counter==counter:
                 self.game_over=True
-        return _mock_resolve_conditions
+        return _mock_resolve_temporary_conditions
     
-    return interaction,get_mock_resolve_cond
+    return interaction,get_mock_resolve_temporary_conditions
+
+@pytest.mark.asyncio
+async def test_wizard_happy(async_pair,monkeypatch):
+    interaction,get_mock_resolve_temporary_conditions=async_pair
+    
+    monkeypatch.setattr(GameManager,"resolve_temporary_conditions",get_mock_resolve_temporary_conditions(2)) #how many nights we're doing this for
+    
+    players=[Player(f"p_{n}",RoleName.WASHERWOMAN,RoleName.WASHERWOMAN,Alignment.GOOD) for n in range(5)]
+    players.append(Player("soldier",RoleName.SOLDIER,RoleName.SOLDIER,Alignment.GOOD))
+    players.append(Player("demon",RoleName.IMP,RoleName.IMP,Alignment.EVIL))
+    
+    game=GameManager([p.player_name for p in players])
+    game.players=players
+    
+    game.event_deck=Deck([ENCOUNTER_MAP[WIZARD_COME],ENCOUNTER_MAP[ANGRY_WIZARD]],[1,1,1])
+    
+    monkeypatch.setattr(game.command_cog,"dmdropdown",AsyncMock(side_effect=[WIZARD_YES]))
+    
+    message_queue=[]
+    async def mock_direct_message(user_name: str, message: str):
+        nonlocal message_queue
+        message_queue.append([user_name,message])
+        return True
+    
+    monkeypatch.setattr(game.command_cog,"send_direct_message",mock_direct_message)
+    
+    game.start_game(interaction)
+    
+    
+    
+    
+    
+    
+    # self.command_cog.send_direct_message

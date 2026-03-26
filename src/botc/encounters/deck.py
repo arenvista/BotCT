@@ -31,6 +31,9 @@ class Deck: #each game will have one instance of the deck class
             self.unresolved_encounter_card_list.extend([EncounterCard(encounter) for _ in range(count)])
         update_possibilities()
     
+    def remove_all_cards(self,enc:Encounter):
+        self.resolved_encounter_card_list =[c for c in self.resolved_encounter_card_list if c.specific_encounter!=enc]
+    
     def draw_card(self)-> EncounterCard:
         indices=[c for c,card in enumerate(self.unresolved_encounter_card_list) if (card.specific_encounter.parents_resolved and (card.specific_encounter.impossible==False))]
         index=random.choice(indices)
