@@ -5,7 +5,7 @@ Blood on the Clocktower (botc) core engine package.
 
 # Expose the primary classes and enums at the package level 
 # so they can be imported directly from 'botc'.
-from .enums import Alignment, RoleClass, RoleName
+from .enums import Alignment, RoleClass, RoleName, StatusItem, Status
 from .player import Player
 
 # __all__ restricts what gets imported if someone uses `from botc import *`

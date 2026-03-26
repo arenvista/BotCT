@@ -1,6 +1,6 @@
 # src/botc/behaviors/townsfolk.py
 from __future__ import annotations      
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING, List, Optional, Set
 if TYPE_CHECKING:                        
     from botc.player import Player
     from botc.core.game import GameManager
@@ -15,7 +15,7 @@ ROLES_MINIONS = RoleName.get_by_class(RoleClass.MINIONS)
 ROLES_OUTSIDERS = RoleName.get_by_class(RoleClass.OUTSIDERS)
 ROLES_TOWNSFOLK = RoleName.get_by_class(RoleClass.TOWNSFOLK)
 
-def get_filtered_players(game: GameManager, is_true_role: Optional[bool] = None, role_name: Optional[RoleName] = None, alignment: Optional[Alignment] = None, status: Optional[Status] = None) -> List[Player]:
+def get_filtered_players(game: GameManager, is_true_role: Optional[bool] = None, role_name: Optional[RoleName] = None, alignment: Optional[Alignment] = None, status: Optional[Status] = None, excluded_players: Optional[Set[Player]] = None ) -> List[Player]:
     # Start with all players in the game
     player_list: List[Player] = game.players
 
@@ -37,12 +37,10 @@ def get_filtered_players(game: GameManager, is_true_role: Optional[bool] = None,
 
     # Filter by Status
     if status is not None:
-        if status == Status.POISIONED: # Note: Matching your enum spelling 'POISIONED'
-            player_list = [p for p in player_list if p.poisoned]
-        elif status == Status.DRUNK:
-            player_list = [p for p in player_list if p.registered_role == RoleName.DRUNK]
-        elif status == Status.PROTECTED:
-            player_list = [p for p in player_list if p.protected]
+            player_list = [p for p in player_list if p.status == status]
+
+    if excluded_players is not None:
+        player_list = list(set(player_list) - excluded_players)
 
     return player_list
 
@@ -52,6 +50,7 @@ class WasherwomanBehavior(RoleBehavior):
     first_night_priority = 3
     
     async def act(self, player: Player, game: GameManager):
+        filter = Status()
         is_reliable: bool = not (player.registered_role == RoleName.DRUNK or player.poisoned)
         selected_players: List[str] = []
         role_to_reveal: str = ""
@@ -104,7 +103,7 @@ class WasherwomanBehavior(RoleBehavior):
 class LibrarianBehavior(RoleBehavior):
     first_night_priority = 4
     async def act(self, player: Player, game: GameManager):
-        is_reliable: bool = player.registered_role == RoleName.DRUNK or player.poisoned
+        is_reliable: bool = player.status.is_reliable()
         selected_players: List[str] = []
         role_to_reveal: str = ""
         if is_reliable: # Regular
@@ -123,7 +122,7 @@ class LibrarianBehavior(RoleBehavior):
 class InvestigatorBehavior(RoleBehavior):
     first_night_priority = 5
     async def act(self, player: Player, game: GameManager):
-        is_reliable: bool = player.registered_role == RoleName.DRUNK or player.poisoned
+        is_reliable: bool = player.status.is_reliable()
         selected_players: List[str] = []
         role_to_reveal: str = ""
         if is_reliable: # Regular
@@ -143,7 +142,7 @@ class ChefBehavior(RoleBehavior):
         print(f"\nWake {player.believed_role} ({player.player_name}). Show them pairs of evil players. Put to sleep.")
         # TODO: Implement Logic
 
-        is_reliable: bool = not (player.registered_role == RoleName.DRUNK or player.poisoned)
+        is_reliable: bool = player.status.is_reliable()
 
         if is_reliable: # not drunk or poisoned
             # TODO: Needs testing. Have not tested [E, G, G, G, G, G, E] or [G, G, G, E, E, E, G, G,]
@@ -184,7 +183,7 @@ class EmpathBehavior(RoleBehavior):
     other_night_priority = 8
 
     async def act(self, player: Player, game: GameManager) -> None:
-        is_reliable: bool = player.registered_role == RoleName.DRUNK or player.poisoned
+        is_reliable: bool = player.status.is_reliable()
         left_neighbor, right_neighbor = game.get_alive_neighbors(player)
         evil_count = 0
         if left_neighbor and left_neighbor.registered_alignment == Alignment.EVIL: evil_count += 1
@@ -198,7 +197,7 @@ class FortuneTellerBehavior(RoleBehavior):
     first_night_priority = 8
     other_night_priority = 9
     async def act(self, player: Player, game: GameManager):
-        possible_selections: List[Player] = [p for p in game.players if p.alive == True and p != player]
+        possible_selections: List[Player] = [p for p in game.players if p.status.alive.state == True and p != player]
         selected_player_names: List[str] = []
         selected_player_names.append(game.get_user_choice([p.player_name for p in possible_selections], "Select First Player to Divine"))
         selected_player_names.append(game.get_user_choice([p.player_name for p in possible_selections], "Select Second Player to Divine"))
@@ -245,11 +244,8 @@ class UndertakerBehavior(RoleBehavior):
 class MonkBehavior(RoleBehavior):
     other_night_priority = 2
     async def act(self, player: Player, game: GameManager) -> None:
-        prompt = f"\nWake {player.believed_role} ({player.player_name}). Who do they protect?"
-        print(prompt)
-        target = game.get_player_by_name()
-        if not player.poisoned: target.protected = True
-        print(f"Put {player.believed_role} to sleep.")
+        target_list = get_filtered_players(game, excluded_players=set([player]))
+        target = await game.command_cog.dmdropdown(player.player_name, "Who do you protect?", [p.player_name for p in target_list], 1)
 
 @register_role(RoleName.RAVENKEEPER)
 class RavenkeeperBehavior(RoleBehavior):
@@ -332,6 +328,7 @@ class SoldierBehavior(RoleBehavior):
         
         is_reliable: bool = not (player.registered_role == RoleName.DRUNK or player.poisoned)
 
+        Status
         if is_reliable:
             player.protected = True
         else: # if Drunk, they are not protected. If poisoned, they are not protected from Imp's Attack

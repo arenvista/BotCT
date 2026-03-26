@@ -1,13 +1,61 @@
 # src/botc/enums.py
 from enum import Enum
-from typing import List
+from typing import List, Optional
 
-class Status(Enum):
-    POISIONED = 1
-    DRUNK = 2
-    PROTECTED = 3
-    def __str__(self):
-        return self.name.title()
+class StatusItem:
+    def __init__(self, state: Optional[bool]):
+        self.state = state
+    def __invert__(self):
+        """Allows using ~Status.POISONED to toggle the boolean inline."""
+        self.state = not self.state
+        return self
+    def __repr__(self):
+        # Makes it print out nicely like your original tuples
+        return f"{self.state}"
+
+class Status:
+    # We replace the immutable tuples with our mutable StatusItem objects
+    def __init__(self, poisoned: StatusItem, drunk: StatusItem, protected: StatusItem, alive: StatusItem):
+        self.poisoned = StatusItem(False)
+        self.drunk = StatusItem(False)
+        self.protected = StatusItem(False)
+        self.alive = StatusItem(True)
+
+    def is_reliable(self) -> bool:
+        return self.poisoned.state == False and self.drunk.state == False
+
+    def is_protected(self) -> bool:
+        return self.poisoned.state == False and self.protected.state == False
+
+    def __eq__(self, other) -> bool:
+        # Optional but highly recommended: ensure we are comparing to another Status (or similar) object
+        if not isinstance(other, Status):
+            return False
+
+        # Loop via all members_vars in self
+        for attr_name, my_status_item in vars(self).items():
+            # Match var in other
+            other_status_item = getattr(other, attr_name, None)
+            # If other is not None
+            if other_status_item is not None:
+                # Comparte them
+                if my_status_item.state != other_status_item.state:
+                    return False 
+        return True
+
+    @classmethod
+    def toggle_state(cls, status_name: str):
+        """Allows toggling by passing the string name of the status."""
+        # Fetch the attribute by string name, converting to uppercase just in case
+        status_obj = getattr(cls, status_name.upper(), None)
+        
+        if isinstance(status_obj, StatusItem):
+            # Toggle the inner state
+            status_obj.state = not status_obj.state
+            print(f"{status_name.upper()} toggled to {status_obj.state}")
+        else:
+            raise ValueError(f"Status '{status_name}' does not exist.")
+
 
 class Alignment(Enum):
     GOOD = 1
