@@ -22,7 +22,7 @@ class GameManager:
 
     def __init__(self, player_names: List[str] = []):
         self.player_names = player_names
-        if os.environ["ENCOUNTER"]=="1":
+        if "ENCOUNTER" in os.environ and os.environ["ENCOUNTER"]=="1":
             self.event_interval=1 #how frequently to do an event, hardcoded for now
             self.event_deck=Deck.from_json("default")
         
