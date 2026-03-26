@@ -14,122 +14,72 @@ from botc.discord_manager.bot import BotManager
 from botc.discord_manager.polling import PollManager
 from botc.discord_manager.cogs.game_commands import GameCommands
 
-class GameManager:
-    ROLES_DEMONS = RoleName.get_by_class(RoleClass.DEMONS)
-    ROLES_MINIONS = RoleName.get_by_class(RoleClass.MINIONS)
-    ROLES_OUTSIDERS = RoleName.get_by_class(RoleClass.OUTSIDERS)
-    ROLES_TOWNSFOLK = RoleName.get_by_class(RoleClass.TOWNSFOLK)
+from dataclasses import dataclass
 
+@dataclass
+class Counters:
+    turn: int = 0
+    day: int = 0
+    night: int = 0
+
+class PlayerManager():
     def __init__(self, player_names: List[str] = []):
         self.player_names = player_names
+        self.roles_distribution = RoleDistributor(self.player_names)
+        self.player_list: List[Player] = self.roles_distribution.assign_roles()
+
+    @property 
+    def players_alive(self) -> List[Player]:
+        return [player for player in self.player_list if player.status.alive]
+
+
+
+class EventManager():
+    def __init__(self):
         self.event_interval=1 #how frequently to do an event, hardcoded for now
         self.event_deck=Deck.from_json("default")
-        
-        if self.player_names:
-            self.roles_distribution = RoleDistributor(self.player_names)
-            self.players: List[Player] = self.assign_roles()
-            self.players_alive: List[Player] = self.players
-        else:
-            self.players = []
-            self.players_alive = []
-            
-        self.turn_counter: int = 0
-        self.day_counter: int = 0
-        self.night_counter: int = 0
-        self.game_over: bool = False
-        
-        self.game_master: str = ""
+
+
+@dataclass
+class VoteTable():
+    vote_table: dict[str, dict[str, int]] = {}
+
+class ExecuteManager():
+    def __init__(self):
         self.killed_tonight: Optional[Player] = None
         self.executed_player: str = ""
-        self.nominator: str = ""
-        
-        self.vote_table: dict[str, dict[str, int]] = {}
-        self.reset_vote_table()
-
-        # Init bot components
-        load_dotenv()
-        self.token = str(os.getenv("DISCORD_TOKEN"))
-        self.bot = BotManager(self)
-        self.poll_manager = PollManager(self)
-        self.command_cog = GameCommands(self.bot, self)
-
-    async def modify_information(self, message: str, choices: List[str], max_input: int):
-        return await self.command_cog.dmpoll(self.game_master, message, choices, max_input)
-
+        self.player_names: List[str] = []
     def reset_vote_table(self):
         self.vote_table = {
             voter: {candidate: 0 for candidate in self.player_names}
             for voter in self.player_names
         }
 
-    def assign_roles(self) -> List[Player]:
-        demon_count = self.roles_distribution.num_demons
-        outsider_count = self.roles_distribution.num_outsiders
-        townsfolk_count = self.roles_distribution.num_townsfolk
-        minion_count = self.roles_distribution.num_minions
+class DiscordManager():
+    def __init__(self, game: 'GameManager'):
+        # Init bot components
+        load_dotenv()
+        self.token = str(os.getenv("DISCORD_TOKEN"))
+        self.bot = BotManager(game)
+        self.poll_manager = PollManager(game)
+        self.command_cog = GameCommands(self.bot, game)
 
-        chosen_demons = random.sample(self.ROLES_DEMONS, demon_count)
-        chosen_minions = random.sample(self.ROLES_MINIONS, minion_count)
+    async def modify_information(self, target: str, message: str, choices: List[str], max_input: int):
+        return await self.command_cog.dmpoll(target, message, choices, max_input)
 
-        if RoleName.BARON in chosen_minions:
-            # Note: In standard Blood on the Clocktower, Baron adds 2 Outsiders, not 3!
-            # Change this to 2 if you want to follow standard Trouble Brewing rules.
-            BARON_OUTSIDER_OFFSET = 2 
-            outsider_count += BARON_OUTSIDER_OFFSET
-            townsfolk_count -= BARON_OUTSIDER_OFFSET
-
-        chosen_outsiders = random.sample(self.ROLES_OUTSIDERS, outsider_count)
-        chosen_townsfolk = random.sample(self.ROLES_TOWNSFOLK, townsfolk_count)
-        selected_roles = chosen_demons + chosen_outsiders + chosen_townsfolk + chosen_minions
-
-        drunk_fake_role = None
-        if RoleName.DRUNK in chosen_outsiders:
-            available_townsfolk = [r for r in self.ROLES_TOWNSFOLK if r not in chosen_townsfolk]
-            drunk_fake_role = random.choice(available_townsfolk)
-
-        spy_fake_role = None
-        if RoleName.SPY in chosen_minions:
-            available_good_roles = [
-                r for r in (self.ROLES_TOWNSFOLK + self.ROLES_OUTSIDERS) 
-                if r not in (chosen_townsfolk + chosen_outsiders) and r != drunk_fake_role
-            ]
-            if available_good_roles:
-                spy_fake_role = random.choice(available_good_roles)
-
-
-        random.shuffle(selected_roles)
-
-        assigned_players: List[Player] = []
-        for player_name, role_enum in zip(self.player_names, selected_roles):
-            
-            # The Drunk thinks they are a Townsfolk, otherwise everyone believes their actual role
-            believed_role = drunk_fake_role if role_enum == RoleName.DRUNK else role_enum
-            
-            # The Spy registers falsely to abilities, otherwise everyone registers as their actual role
-            registered_role = spy_fake_role if role_enum == RoleName.SPY else role_enum
-            
-            # Spy registers as Good, everyone else passes None so Player.__init__ sets their default
-            registered_alignment = Alignment.GOOD if role_enum in self.ROLES_TOWNSFOLK+self.ROLES_OUTSIDERS else Alignment.EVIL
-
-            assigned_players.append(
-                Player(player_name, believed_role, registered_role, registered_alignment)
-            )
-
-        if RoleName.FORTUNE_TELLER in chosen_townsfolk:
-            red_herring_index = random.randint(0,len(chosen_townsfolk)-1)
-            assigned_players[red_herring_index].status.red_herring = True
-
-        return assigned_players
-    
+class GameManager:
+    def __init__(self):
+        self.game_over: bool = False
+        self.counter = Counters
+        self.game_master: str = ""
+        self.mgr_player: PlayerManager = PlayerManager()
+        
     def resolve_temporary_conditions(self):
         for player in self.players:
             player.status.protected=False
             player.status.poisoned=False
 
     async def start_game(self, interaction: discord.Interaction):
-        # self.roles_distribution = RoleDistributor(self.player_names)
-        self.players = self.assign_roles()
-
         self.players_alive = self.players
         await self.message_roles_to_players()
 

@@ -26,6 +26,10 @@ class Status:
         else:
             raise ValueError(f"Status '{attr_name}' does not exist.")
 
+    def resolve_temporary_conditions(self):
+        self.protected=False
+        self.poisoned=False
+
 class Alignment(Enum):
     GOOD = 1
     EVIL = 2

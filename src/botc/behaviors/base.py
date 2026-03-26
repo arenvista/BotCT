@@ -20,6 +20,10 @@ class RoleBehavior(ABC):
     other_night_priority: Optional[int] = None
     is_reliable: bool = True  # Base property, but actual reliability is dynamic
 
+    async def query_player(self, username, message, options, max_selection):
+        await game.command_cog.drop
+
+
     async def check_gm_override(self, game: GameManager, player: Player) -> bool:
         """
         Asks the Game Master if they want to manually override the default
