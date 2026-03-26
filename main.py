@@ -22,6 +22,7 @@ if __name__ == "__main__":
     parser.add_argument("--testing",action="store_true")
     parser.add_argument("--disable_voting",action="store_true")
     parser.add_argument("--immortal",action="store_true",help="no players can die")
+    parser.add_argument("--disable_encounter",action="store_true")
     
     args=parser.parse_args()
     if args.testing:
@@ -38,4 +39,9 @@ if __name__ == "__main__":
         os.environ["IMMORTAL"]="1"
     else:
         os.environ["IMMORTAL"]="0"
+        
+    if args.disable_encounter:
+        os.environ["ENCOUNTER"]="0"
+    else:
+        os.environ["ENCOUNTER"]="1"
     main()
