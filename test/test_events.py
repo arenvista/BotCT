@@ -1,6 +1,12 @@
 import botc.encounters
 from botc.encounters import simple,deck,ENCOUNTER_MAP,Deck
 from botc.encounters.base import reset_resolved
+from botc.core.game import GameManager
+from botc.behaviors.base import RoleBehavior
+from types import SimpleNamespace
+from unittest.mock import AsyncMock
+from botc.discord_manager import PollManager
+from botc.discord_manager.cogs.game_commands import GameCommands
 import pytest
 
 
@@ -46,3 +52,28 @@ def test_deck():
 def test_deck_from_json():
     d=Deck.from_json("default.json")
     d.draw_card()
+    
+@pytest.fixture
+def async_pair(monkeypatch):
+    interaction=SimpleNamespace(
+        response=SimpleNamespace(send_message=AsyncMock(),is_done=AsyncMock(True)),
+        channel=SimpleNamespace(send=AsyncMock())
+    )
+    
+    
+    async def mock_nothing(*args,**kwargs):
+        return
+    monkeypatch.setattr(RoleBehavior,"act",mock_nothing)
+    monkeypatch.setattr(PollManager,"run_execution_poll",mock_nothing)
+    monkeypatch.setattr(GameCommands,"send_direct_message",mock_nothing)
+    
+    def get_mock_resolve_cond(counter):
+        def _mock_resolve_conditions(self): #mocking this to eventually end the game after n turns
+            for player in self.players:
+                player.protected=False
+                player.poisoned=False
+            if self.day_counter==counter:
+                self.game_over=True
+        return _mock_resolve_conditions
+    
+    return interaction,get_mock_resolve_cond
