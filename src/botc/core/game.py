@@ -97,6 +97,7 @@ class GameManager:
             if available_good_roles:
                 spy_fake_role = random.choice(available_good_roles)
 
+
         random.shuffle(selected_roles)
 
         assigned_players: List[Player] = []
@@ -115,6 +116,10 @@ class GameManager:
                 Player(player_name, believed_role, registered_role, registered_alignment)
             )
 
+        if RoleName.FORTUNE_TELLER in chosen_townsfolk:
+            red_herring_index = random.randint(0,len(chosen_townsfolk)-1)
+            assigned_players[red_herring_index].status.red_herring = True
+
         return assigned_players
     
     def resolve_temporary_conditions(self):
@@ -124,10 +129,9 @@ class GameManager:
 
     async def start_game(self, interaction: discord.Interaction):
         # self.roles_distribution = RoleDistributor(self.player_names)
-        # self.players = self.assign_roles()
+        self.players = self.assign_roles()
 
         self.players_alive = self.players
-
         await self.message_roles_to_players()
 
         for player in self.get_wake_order(is_first_night=True):
