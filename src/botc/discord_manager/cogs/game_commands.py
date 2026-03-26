@@ -29,6 +29,8 @@ class GameCommands(commands.Cog):
         user: discord.User | None = discord.utils.find(
             lambda u: u.name.lower() == clean_name or (u.global_name and u.global_name.lower() == clean_name), 
             self.bot.users
+            
+            
         )
         
         if user is None:

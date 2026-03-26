@@ -134,7 +134,7 @@ class GameManager:
             if self.event_deck:
                 card=self.event_deck.draw_card()
                 await interaction.channel.send(card.specific_encounter.flavor_text) 
-                card.specific_encounter.resolve(self)
+                await card.specific_encounter.resolve(self)
                 
             
             for player in self.get_wake_order(is_first_night=False):
