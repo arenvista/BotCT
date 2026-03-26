@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Optional
 import discord
 import asyncio
 import datetime
+from datetime import timedelta
 import random
 
 from botc.discord_manager.views import ExecutionView
@@ -15,101 +16,62 @@ class PollManager:
     def __init__(self, game: GameManager) -> None:
         self.game: GameManager = game
 
-    async def run_gamemaster_poll(self, interaction: discord.Interaction, allowed_player_names: list[str]) -> Optional[discord.Message]:
-        if not isinstance(interaction.channel, discord.TextChannel):
-            error_msg = "This action can only be used in a text channel."
-            if interaction.response.is_done():
-                await interaction.followup.send(error_msg, ephemeral=True) 
-            else:
-                await interaction.response.send_message(error_msg, ephemeral=True)
-            return None
+    async def run_gamemaster_poll(self, interaction: discord.Interaction, player_names: List[str]):
+        """
+        Conducts a poll to select the Game Master.
+        """
+        # Filter candidate list to exclude the bot itself
+        candidates = [name for name in player_names if name.lower() != self.game.bot.user.name.lower()]
+        
+        if not candidates:
+            # Fallback if no valid candidates exist
+            self.game.game_master = interaction.user.name
+            await interaction.followup.send(f"⚠️ No candidates found. {interaction.user.name} has been assigned as GM.")
+            return
 
-        if interaction.response.is_done():
-            await interaction.followup.send("Creating GM poll...", ephemeral=True) 
-        else:
-            await interaction.response.send_message("Creating GM poll...", ephemeral=True)
-
-        duration_minutes: int = 4
+        # FIX: Use datetime.timedelta and pass the duration (not a timestamp)
         poll = discord.Poll(
-            question="Do you want to be a GM?",
-            duration=datetime.timedelta(hours=1),
+            question="Who should be the Game Master?",
+            duration=datetime.timedelta(minutes=2),
             multiple=False
         )
-        poll.add_answer(text="Yes", emoji="🙋")
-        poll.add_answer(text="No / Skip", emoji="⏭️")
 
-        thread: discord.Thread = await interaction.channel.create_thread(
-            name="GameMaster Voting", type=discord.ChannelType.public_thread
-        )
+        for name in candidates[:10]:  # Discord polls are limited to 10 options
+            poll.add_answer(text=name)
 
-        poll_message: discord.Message = await thread.send(poll=poll)
-        
-        num_players: int = len(allowed_player_names)
-        max_wait_time: int = duration_minutes * 60
-        elapsed_time: int = 0
-
-        # Safe Polling Loop with HTTP Exception catching
-        while elapsed_time < max_wait_time:
-            await asyncio.sleep(5)
-            elapsed_time += 5
-            try:
-                poll_message = await thread.fetch_message(poll_message.id)
-            except discord.HTTPException:
-                continue
-            
-            if poll_message.poll and sum(a.vote_count for a in poll_message.poll.answers) >= num_players:
-                break
-
+        # Use followup.send because the interaction was likely already responded to
         try:
-            poll_message = await poll_message.end_poll()
-        except Exception:
-            try:
-                poll_message = await thread.fetch_message(poll_message.id)
-            except discord.HTTPException:
-                pass
+            poll_message = await interaction.followup.send(
+                content="📊 **Please vote for your Game Master!** The poll will close in 2 minutes.",
+                poll=poll
+            )
+        except discord.HTTPException as e:
+            print(f"Failed to send poll: {e}")
+            return
 
-        if poll_message.poll is None: 
-            raise ValueError("Poll Msg Returned Null")
-            
-        yes_votes: Optional[discord.PollAnswer] = discord.utils.get(poll_message.poll.answers, text="Yes")
-        candidates: list[discord.User | discord.Member] = []
-        
-        if yes_votes:
-            # Clean up the allowed list so we can match it safely against Discord users
-            clean_allowed_names = [n.lstrip('@').lower() for n in allowed_player_names]
-            
-            async for user in yes_votes.voters():
-                user_clean = user.name.lower()
-                global_clean = user.global_name.lower() if user.global_name else ""
-                
-                if user_clean in clean_allowed_names or global_clean in clean_allowed_names:
-                    candidates.append(user)
+        # Wait for the poll duration
+        await asyncio.sleep(120)
 
-        if candidates:
-            selected_gm = random.choice(candidates)
-            self.game.game_master = selected_gm.name
-            await thread.send(f"🎲 The randomly selected GM is {selected_gm.mention}!")
-            
-            # 1. Try to remove them from instantiated player lists (if they exist yet)
-            try:
-                # FIXED: Removed 'await' since get_player_by_name is synchronous
-                gm_player = self.game.get_player_by_name(selected_gm.name)
-                if gm_player in self.game.players:
-                    self.game.players.remove(gm_player)
-                if gm_player in self.game.players_alive:
-                    self.game.players_alive.remove(gm_player)
-            except ValueError:
-                pass # Player not found in list, which is fine
-                
-            for name in allowed_player_names:
-                clean_n = name.lstrip('@').lower()
-                if clean_n == selected_gm.name.lower() or (selected_gm.global_name and clean_n == selected_gm.global_name.lower()):
-                    self.game.player_names.remove(name)
-                    break
-        else:
-            await thread.send("Nobody volunteered to be the GM.")
+        # Refresh message to get latest poll results and end it manually if needed
+        try:
+            poll_message = await poll_message.channel.fetch_message(poll_message.id)
+            if poll_message.poll and not poll_message.poll.is_finalised:
+                await poll_message.end_poll()
+        except discord.HTTPException:
+            pass
 
-        return poll_message
+        # Calculate winner
+        winner_name = candidates[0] # Default to first player
+        max_votes = -1
+
+        if poll_message.poll:
+            for answer in poll_message.poll.answers:
+                if answer.vote_count > max_votes:
+                    max_votes = answer.vote_count
+                    winner_name = answer.text
+
+        self.game.game_master = winner_name
+        await interaction.followup.send(f"👑 **{winner_name}** has been elected as the Game Master!")
 
     async def run_execution_poll(self, interaction: discord.Interaction, allowed_player_ids: list[str]) -> Optional[discord.Message]:
         if not isinstance(interaction.channel, discord.TextChannel):
@@ -193,7 +155,7 @@ class PollManager:
             # Update the Game State
             try:
                 p = self.game.get_player_by_name(executed_target_name)
-                p.alive = False
+                p.status.alive = False
                 self.game.executed_player = executed_target_name
             except ValueError as e:
                 await thread.send(f"⚠️ Error: Could not find player.")
