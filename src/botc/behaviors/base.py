@@ -1,52 +1,156 @@
 # src/botc/behaviors/base.py
 from __future__ import annotations
+
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Any, Dict, Optional
 
 from botc.enums import RoleName
+
 from . import register_role
 
 if TYPE_CHECKING:
-    from botc.player import Player
     from botc.core.game import GameManager
+    from botc.player import Player
+
 
 class RoleBehavior(ABC):
+    """The absolute root of all roles."""
+
     first_night_priority: Optional[int] = None
     other_night_priority: Optional[int] = None
-    is_reliable: bool = True # Base property, but actual reliability is dynamic
+    is_reliable: bool = True  # Base property, but actual reliability is dynamic
 
-    # --- NEW HELPER METHOD ---
     async def check_gm_override(self, game: GameManager, player: Player) -> bool:
         """
-        Asks the Game Master if they want to manually override the default 
+        Asks the Game Master if they want to manually override the default
         night action for this player. Returns True if the GM wants to intervene.
         """
         if game.game_master == "":
             return False
-            
-        is_reliable: bool = not (player.actual_role == RoleName.DRUNK or player.poisoned)
-        role_name: str = player.actual_role.__str__()
-        
+
+        role_name: str = str(player.registered_role)
+
         # Dynamically build the prompt so the GM knows EXACTLY what state the player is in
-        if is_reliable:
+        if player.status.is_reliable:
             prompt_text = f"Skip Manual Entry for {role_name} ({player.player_name})?"
         else:
             prompt_text = f"Skip Manual Entry for Drunk/Poisoned {role_name} ({player.player_name})?"
-            
+
         gm_skip = await game.command_cog.dmdropdown(
-            game.game_master, 
-            prompt_text, 
-            ["Yes", "No"], 
-            1
+            user_name=game.game_master,
+            message_text=prompt_text,
+            options=["Yes", "No"],
+            max_selection=1,
         )
-        
+
         # Return True if they clicked "No" (meaning, DO NOT skip manual entry)
-        return (gm_skip is not None and gm_skip[0] == "No")
+        return gm_skip is not None and gm_skip[0] == "No"
 
     @abstractmethod
     async def act(self, player: Player, game: GameManager) -> None:
+        """Every role must do *something* at night."""
         pass
 
+
+# --- THE ARCHETYPES ---
+
+
+class InfoRoleBehavior(RoleBehavior):
+    """
+    Archetype for roles that receive information from the ST.
+    (e.g., Washerwoman, Investigator, Empath, Librarian)
+    """
+
+    async def act(self, player: Player, game: GameManager) -> None:
+        is_reliable: bool = player.status.is_reliable
+        wants_manual = await self.check_gm_override(game, player)
+
+        night_data: Dict[str, Any] = {}
+
+        if is_reliable:
+            night_data = await self.get_default_trusted(player, game)
+            if wants_manual:
+                night_data = await self.get_manual_trusted(player, game, night_data)
+        else:
+            night_data = await self.get_default_dishonest(player, game)
+            if wants_manual:
+                night_data = await self.get_manual_dishonest(player, game, night_data)
+
+        if night_data:
+            await self.send_result(player, game, night_data)
+
+    @abstractmethod
+    async def get_default_trusted(
+        self, player: Player, game: GameManager
+    ) -> Dict[str, Any]:
+        pass
+
+    @abstractmethod
+    async def get_manual_trusted(
+        self, player: Player, game: GameManager, default_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        pass
+
+    @abstractmethod
+    async def get_default_dishonest(
+        self, player: Player, game: GameManager
+    ) -> Dict[str, Any]:
+        pass
+
+    @abstractmethod
+    async def get_manual_dishonest(
+        self, player: Player, game: GameManager, default_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        pass
+
+    @abstractmethod
+    async def send_result(
+        self, player: Player, game: GameManager, night_data: Dict[str, Any]
+    ) -> None:
+        pass
+
+
+class ActionRoleBehavior(RoleBehavior):
+    """
+    Archetype for roles that target players but don't get info back.
+    (e.g., Monk, Imp, Poisoner)
+    """
+
+    async def act(self, player: Player, game: GameManager) -> None:
+        wants_manual = await self.check_gm_override(game, player)
+
+        if wants_manual:
+            target = await self.get_manual_target(player, game)
+        else:
+            target = await self.get_default_target(player, game)
+
+        if target:
+            await self.execute_action(player, target, game)
+
+    @abstractmethod
+    async def get_default_target(
+        self, player: Player, game: GameManager
+    ) -> Optional[Player]:
+        pass
+
+    @abstractmethod
+    async def get_manual_target(
+        self, player: Player, game: GameManager
+    ) -> Optional[Player]:
+        pass
+
+    @abstractmethod
+    async def execute_action(
+        self, player: Player, target: Player, game: GameManager
+    ) -> None:
+        pass
+
+
 class PassiveBehavior(RoleBehavior):
+    """
+    Archetype for roles that do nothing during the night phase.
+    (e.g., passive Outsiders, Day-acting roles)
+    """
+
     async def act(self, player: Player, game: GameManager) -> None:
         pass

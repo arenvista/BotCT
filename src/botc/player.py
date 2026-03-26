@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
 
-from botc.enums import Alignment, RoleClass, RoleName, Status, StatusItem
+from botc.enums import Alignment, RoleClass, RoleName, Status
 from botc.behaviors import BEHAVIOR_MAP
 from botc.behaviors.base import PassiveBehavior
 
@@ -17,6 +17,7 @@ class Player:
         self.registered_alignment: Alignment = registered_alignment if registered_alignment else self._default_alignment()
         self.status: Status = Status()
         self.role_behavior: RoleBehavior = BEHAVIOR_MAP.get(self.believed_role, PassiveBehavior())
+        self.vote_token: int = 1
 
     def show_role(self):
         output = f"""Hi {self.player_name}, you are the {self.believed_role}"""
@@ -42,9 +43,3 @@ class Player:
             "poisoned": self.status.poisoned,
             "protected": self.status.protected
         }
-
-    def propose_candidate(self, game: GameManager):
-        potential_candidates = [player for player in game.players if player.status.alive == True]
-        selection = ""
-        if selection:
-            game.vote_table[self.player_name][selection] += 1

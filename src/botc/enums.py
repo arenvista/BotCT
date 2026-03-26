@@ -1,61 +1,30 @@
 # src/botc/enums.py
+from dataclasses import dataclass
 from enum import Enum
-from typing import List, Optional
+from typing import List
 
-class StatusItem:
-    def __init__(self, state: Optional[bool]):
-        self.state = state
-    def __invert__(self):
-        """Allows using ~Status.POISONED to toggle the boolean inline."""
-        self.state = not self.state
-        return self
-    def __repr__(self):
-        # Makes it print out nicely like your original tuples
-        return f"{self.state}"
-
+@dataclass
 class Status:
-    # We replace the immutable tuples with our mutable StatusItem objects
-    def __init__(self, poisoned: StatusItem, drunk: StatusItem, protected: StatusItem, alive: StatusItem):
-        self.poisoned = StatusItem(False)
-        self.drunk = StatusItem(False)
-        self.protected = StatusItem(False)
-        self.alive = StatusItem(True)
+    poisoned: bool = False
+    drunk: bool = False
+    protected: bool = False
+    alive: bool = True
+    red_herring: bool = False
 
+    @property
     def is_reliable(self) -> bool:
-        return self.poisoned.state == False and self.drunk.state == False
+        return not self.poisoned and not self.drunk
 
+    @property
     def is_protected(self) -> bool:
-        return self.poisoned.state == False and self.protected.state == False
+        return self.protected and not self.poisoned
 
-    def __eq__(self, other) -> bool:
-        # Optional but highly recommended: ensure we are comparing to another Status (or similar) object
-        if not isinstance(other, Status):
-            return False
-
-        # Loop via all members_vars in self
-        for attr_name, my_status_item in vars(self).items():
-            # Match var in other
-            other_status_item = getattr(other, attr_name, None)
-            # If other is not None
-            if other_status_item is not None:
-                # Comparte them
-                if my_status_item.state != other_status_item.state:
-                    return False 
-        return True
-
-    @classmethod
-    def toggle_state(cls, status_name: str):
-        """Allows toggling by passing the string name of the status."""
-        # Fetch the attribute by string name, converting to uppercase just in case
-        status_obj = getattr(cls, status_name.upper(), None)
-        
-        if isinstance(status_obj, StatusItem):
-            # Toggle the inner state
-            status_obj.state = not status_obj.state
-            print(f"{status_name.upper()} toggled to {status_obj.state}")
+    def toggle(self, attr_name: str):
+        """Allows toggling dynamically by string: player.status.toggle('poisoned')"""
+        if hasattr(self, attr_name):
+            setattr(self, attr_name, not getattr(self, attr_name))
         else:
-            raise ValueError(f"Status '{status_name}' does not exist.")
-
+            raise ValueError(f"Status '{attr_name}' does not exist.")
 
 class Alignment(Enum):
     GOOD = 1

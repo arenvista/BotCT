@@ -1,13 +1,14 @@
 # src/botc/behaviors/townsfolk.py
 from __future__ import annotations      
-from typing import TYPE_CHECKING, List, Optional, Set
+from typing import TYPE_CHECKING, List, Optional, Set, Dict, Any
+import random
+
 if TYPE_CHECKING:                        
     from botc.player import Player
     from botc.core.game import GameManager
 
-import random
-from botc.enums import RoleName, Alignment, RoleClass, Status
-from .base import RoleBehavior
+from botc.enums import RoleName, Alignment, RoleClass
+from .base import RoleBehavior, InfoRoleBehavior, ActionRoleBehavior, PassiveBehavior
 from . import register_role
 
 ROLES_DEMONS = RoleName.get_by_class(RoleClass.DEMONS)
@@ -15,353 +16,265 @@ ROLES_MINIONS = RoleName.get_by_class(RoleClass.MINIONS)
 ROLES_OUTSIDERS = RoleName.get_by_class(RoleClass.OUTSIDERS)
 ROLES_TOWNSFOLK = RoleName.get_by_class(RoleClass.TOWNSFOLK)
 
-def get_filtered_players(game: GameManager, is_true_role: Optional[bool] = None, role_name: Optional[RoleName] = None, alignment: Optional[Alignment] = None, status: Optional[Status] = None, excluded_players: Optional[Set[Player]] = None ) -> List[Player]:
-    # Start with all players in the game
+def get_filtered_players(
+    game: GameManager, 
+    role_names_registered: Optional[set[RoleName]] = None, 
+    role_names_believed: Optional[set[RoleName]] = None, 
+    alignment: Optional[Alignment] = None, 
+    is_poisoned: Optional[bool] = None,
+    is_drunk: Optional[bool] = None,
+    is_alive: Optional[bool] = None,
+    is_protected: Optional[bool] = None,
+    excluded_players: Optional[Set[Player]] = None 
+) -> List[Player]:
+    
     player_list: List[Player] = game.players
-
-    # Filter by Role
-    if role_name is not None:
-        if is_true_role is None:
-            raise ValueError("If a role_name is given, is_true_role must also be passed.")
-        
-        if is_true_role: 
-            # Get by their actual underlying role
-            player_list = [p for p in player_list if p.registered_role == role_name]
-        else: 
-            # Get by what they register as to game mechanics (e.g., Spy registering as good/townsfolk)
-            player_list = [p for p in player_list if p.believed_role == role_name]
-
-    # Filter by Alignment
-    if alignment is not None:
-        player_list = [p for p in player_list if p.registered_alignment == alignment]
-
-    # Filter by Status
-    if status is not None:
-            player_list = [p for p in player_list if p.status == status]
-
-    if excluded_players is not None:
-        player_list = list(set(player_list) - excluded_players)
+    if alignment is not None: player_list = [p for p in player_list if p.registered_alignment == alignment]
+    if is_poisoned is not None: player_list = [p for p in player_list if p.status.poisoned == is_poisoned]
+    if is_drunk is not None: player_list = [p for p in player_list if p.status.drunk == is_drunk]
+    if is_alive is not None: player_list = [p for p in player_list if p.status.alive == is_alive]
+    if is_protected is not None: player_list = [p for p in player_list if p.status.protected == is_protected]
+    if role_names_registered is not None: player_list = [p for p in player_list if p.registered_role in role_names_registered]
+    if role_names_believed is not None: player_list = [p for p in player_list if p.registered_role in role_names_believed]
+    if excluded_players is not None: player_list = list(set(player_list) - excluded_players)
 
     return player_list
 
+# ==========================================
+# INFO ROLES (Uses the 4-step Data Pipeline)
+# ==========================================
 
 @register_role(RoleName.WASHERWOMAN)
-class WasherwomanBehavior(RoleBehavior):
+class WasherwomanBehavior(InfoRoleBehavior):
     first_night_priority = 3
-    
-    async def act(self, player: Player, game: GameManager):
-        filter = Status()
-        is_reliable: bool = not (player.registered_role == RoleName.DRUNK or player.poisoned)
-        selected_players: List[str] = []
-        role_to_reveal: str = ""
+
+    async def get_default_trusted(self, player: Player, game: GameManager) -> Dict[str, Any]:
+        valid_townsfolk = [p for p in game.players if p.registered_role.role_class == RoleClass.TOWNSFOLK and p != player]
+        if not valid_townsfolk: return {}
+        actual = random.choice(valid_townsfolk)
+        decoy = random.choice([p for p in game.players if p != actual and p != player])
+        return {"players": [actual.player_name, decoy.player_name], "role": str(actual.registered_role)}
+
+    async def get_manual_trusted(self, player: Player, game: GameManager, default_data: Dict[str, Any]) -> Dict[str, Any]:
+        valid_townsfolk = [p for p in game.players if p.registered_role.role_class == RoleClass.TOWNSFOLK and p != player]
+        gm_town = await game.modify_information("Select a Townsfolk", [p.player_name for p in valid_townsfolk], 1)
+        if not gm_town: return default_data
         
-        # 1. ONE-LINE GM PROMPT
-        wants_manual = await self.check_gm_override(game, player)
+        gm_decoy = await game.modify_information("Select a Decoy", [p.player_name for p in game.players if p.player_name != gm_town[0] and p != player], 1)
+        actual_other = gm_decoy[0] if gm_decoy else default_data["players"][1]
+        
+        return {"players": [gm_town[0], actual_other], "role": str(game.get_player_by_name(gm_town[0]).registered_role)}
 
-        # 2. DETERMINE INFORMATION
-        if is_reliable: # --- REGULAR WASHERWOMAN ---
-            # Default Data
-            valid_townsfolk = [p for p in game.players if p.registered_role.role_class == RoleClass.TOWNSFOLK and p != player]
-            townsfolk_to_reveal = random.choice(valid_townsfolk)
-            valid_others = [p for p in game.players if p != townsfolk_to_reveal and p != player]
-            
-            selected_players = [townsfolk_to_reveal.player_name, random.choice(valid_others).player_name]
-            role_to_reveal = townsfolk_to_reveal.registered_role.__str__()
-            
-            # Optional Override
-            if wants_manual:
-                gm_sel_town = await game.modify_information("Select a Townsfolk to reveal", [p.player_name for p in valid_townsfolk], 1)
-                actual_town = gm_sel_town[0] if gm_sel_town else selected_players[0]
-                
-                gm_sel_other = await game.modify_information("Select the 'wrong' player", [p.player_name for p in game.players if p.player_name != actual_town and p != player], 1)
-                actual_other = gm_sel_other[0] if gm_sel_other else selected_players[1]
-                
-                selected_players = [actual_town, actual_other]
-                role_to_reveal = game.get_player_by_name(actual_town).registered_role.__str__()
-                
-        else: # --- DRUNK / POISONED WASHERWOMAN ---
-            # Default Data
-            selected_players = [p.player_name for p in random.sample([p for p in game.players if p != player], 2)]
-            role_to_reveal = random.choice(game.ROLES_TOWNSFOLK).__str__()
+    async def get_default_dishonest(self, player: Player, game: GameManager) -> Dict[str, Any]:
+        fake_targets = random.sample([p for p in game.players if p != player], 2)
+        return {"players": [p.player_name for p in fake_targets], "role": str(random.choice(ROLES_TOWNSFOLK))}
 
-            # Optional Override
-            if wants_manual:
-                gm_sel_players = await game.modify_information("Select Two People to Reveal (Fake Info)", [p.player_name for p in game.players if p != player], 2)
-                if gm_sel_players and len(gm_sel_players) == 2:
-                    selected_players = gm_sel_players
-                
-                gm_sel_role = await game.modify_information("Select a Role to Reveal (Fake Info)", [r.__str__() for r in game.ROLES_TOWNSFOLK], 1)
-                if gm_sel_role:
-                    role_to_reveal = gm_sel_role[0]
+    async def get_manual_dishonest(self, player: Player, game: GameManager, default_data: Dict[str, Any]) -> Dict[str, Any]:
+        gm_players = await game.modify_information("Select 2 Fake Targets", [p.player_name for p in game.players if p != player], 2)
+        if gm_players and len(gm_players) == 2: default_data["players"] = gm_players
+        gm_role = await game.modify_information("Select Fake Role", [str(r) for r in ROLES_TOWNSFOLK], 1)
+        if gm_role: default_data["role"] = gm_role[0]
+        return default_data
 
-        # 3. FINALIZE & SEND
-        random.shuffle(selected_players)
-        message = f"One of {selected_players[0]} and {selected_players[1]} is the {role_to_reveal}."
-        await game.command_cog.send_direct_message(player.player_name, message)
+    async def send_result(self, player: Player, game: GameManager, night_data: Dict[str, Any]) -> None:
+        players = night_data.get("players", [])
+        if len(players) == 2:
+            random.shuffle(players)
+            msg = f"One of {players[0]} and {players[1]} is the {night_data.get('role')}."
+            await game.command_cog.send_direct_message(player.player_name, msg)
+
 
 @register_role(RoleName.LIBRARIAN)
-class LibrarianBehavior(RoleBehavior):
+class LibrarianBehavior(InfoRoleBehavior):
     first_night_priority = 4
-    async def act(self, player: Player, game: GameManager):
-        is_reliable: bool = player.status.is_reliable()
-        selected_players: List[str] = []
-        role_to_reveal: str = ""
-        if is_reliable: # Regular
-            selected_townsfolk = random.sample([p_other for p_other in game.players if p_other.registered_role.role_class == RoleClass.OUTSIDERS],1)[0]
-            selected_remainder = random.sample([p_other for p_other in game.players if p_other not in (selected_townsfolk, player)], 1)[0]
-            selected_players = [selected_townsfolk.player_name, selected_remainder.player_name]
-            random.shuffle(selected_players)
-            role_to_reveal = selected_townsfolk.registered_role.role_class.display_name
-        else: # If Drunk/Poisioned
-            selected_players = random.sample([p_other.player_name for p_other in game.players if p_other != player], 2)
-            role_to_reveal = random.sample(ROLES_OUTSIDERS, 1)[0].display_name
-        message = "One of " + ",".join(selected_players) + " is a " + role_to_reveal
-        #TODO: log output 
+    # (Implementation mirrors Washerwoman, checking ROLES_OUTSIDERS instead of TOWNSFOLK)
+    async def get_default_trusted(self, player: Player, game: GameManager) -> Dict[str, Any]:
+        valid_outsiders = [p for p in game.players if p.registered_role.role_class == RoleClass.OUTSIDERS and p != player]
+        if not valid_outsiders: return {"players": ["No Outsiders"], "role": "in play"} # BotC specific rule (0 Outsiders ping)
+        actual = random.choice(valid_outsiders)
+        decoy = random.choice([p for p in game.players if p != actual and p != player])
+        return {"players": [actual.player_name, decoy.player_name], "role": str(actual.registered_role)}
 
-@register_role(RoleName.INVESTIGATOR)
-class InvestigatorBehavior(RoleBehavior):
-    first_night_priority = 5
-    async def act(self, player: Player, game: GameManager):
-        is_reliable: bool = player.status.is_reliable()
-        selected_players: List[str] = []
-        role_to_reveal: str = ""
-        if is_reliable: # Regular
-            selected_townsfolk = random.sample([p_other for p_other in game.players if p_other.registered_role.role_class == RoleClass.MINIONS],1)[0]
-            selected_remainder = random.sample([p_other for p_other in game.players if p_other not in (selected_townsfolk, player)], 1)[0]
-            selected_players = [selected_townsfolk.player_name, selected_remainder.player_name]
-            random.shuffle(selected_players)
-            role_to_reveal = selected_townsfolk.registered_role.role_class.display_name
-        else: # If Drunk/Poisioned
-            selected_players = random.sample([p_other.player_name for p_other in game.players if p_other != player], 2)
-        message = "One of " + ",".join(selected_players) + " is a Minion"
+    async def get_manual_trusted(self, player: Player, game: GameManager, default_data: Dict[str, Any]) -> Dict[str, Any]:
+        return default_data # Add GM overrides similar to Washerwoman if desired
+
+    async def get_default_dishonest(self, player: Player, game: GameManager) -> Dict[str, Any]:
+        fake_targets = random.sample([p for p in game.players if p != player], 2)
+        return {"players": [p.player_name for p in fake_targets], "role": str(random.choice(ROLES_OUTSIDERS))}
+
+    async def get_manual_dishonest(self, player: Player, game: GameManager, default_data: Dict[str, Any]) -> Dict[str, Any]:
+        return default_data
+
+    async def send_result(self, player: Player, game: GameManager, night_data: Dict[str, Any]) -> None:
+        players = night_data.get("players", [])
+        if len(players) == 1:
+            await game.command_cog.send_direct_message(player.player_name, "There are no Outsiders in play.")
+        else:
+            random.shuffle(players)
+            await game.command_cog.send_direct_message(player.player_name, f"One of {players[0]} and {players[1]} is the {night_data.get('role')}.")
+
 
 @register_role(RoleName.CHEF)
-class ChefBehavior(RoleBehavior):
+class ChefBehavior(InfoRoleBehavior):
     first_night_priority = 6
-    async def act(self, player: Player, game: GameManager):
-        print(f"\nWake {player.believed_role} ({player.player_name}). Show them pairs of evil players. Put to sleep.")
-        # TODO: Implement Logic
 
-        is_reliable: bool = player.status.is_reliable()
+    async def get_default_trusted(self, player: Player, game: GameManager) -> Dict[str, Any]:
+        pairs = 0
+        n = len(game.players)
+        for i in range(n):
+            if game.players[i].registered_alignment == Alignment.EVIL:
+                next_index = (i + 1) % n
+                if game.players[next_index].registered_alignment == Alignment.EVIL:
+                    pairs += 1
+        return {"pairs": pairs}
 
-        if is_reliable: # not drunk or poisoned
-            # TODO: Needs testing. Have not tested [E, G, G, G, G, G, E] or [G, G, G, E, E, E, G, G,]
-            
-            # assuming that game.players (List) has people in order in which they're seated
-            seated_order: List[Player] = game.players
-            n: int = len(game.players)
-            pairs: int = 0
+    async def get_manual_trusted(self, player: Player, game: GameManager, default_data: Dict[str, Any]) -> Dict[str, Any]:
+        return default_data # Usually GM doesn't override true math, but you can add it
 
-            for i in range(n):
-                #check if player is evil
-                if seated_order[i].registered_alignment == Alignment.EVIL:
-                    # check if person to right is evil
-                    if i < n - 1:
-                        if seated_order[i + 1].registered_alignment == Alignment.EVIL:
-                            pairs += 1
+    async def get_default_dishonest(self, player: Player, game: GameManager) -> Dict[str, Any]:
+        # Give random number from 0-2 depending on distribution of players
+        num_evil = sum(1 for p in game.players if p.registered_alignment == Alignment.EVIL)
+        max_guess = min(num_evil, 2)
+        return {"pairs": random.randint(0, max_guess)}
 
-                    # manually check last person in array
-                    elif i == n - 1:
-                        # check to see if person at index 0 is GOOD or EVIl
-                        if seated_order[0].registered_alignment == Alignment.EVIL:
-                            pairs += 1
-            print(f'Tell {player.player_name} that there are {pairs} pairs')
+    async def get_manual_dishonest(self, player: Player, game: GameManager, default_data: Dict[str, Any]) -> Dict[str, Any]:
+        gm_val = await game.modify_information("Enter False Pair Count (0-3)", ["0", "1", "2", "3"], 1)
+        if gm_val: default_data["pairs"] = int(gm_val[0])
+        return default_data
 
-        else: # either drunk or posioned so give random number from 0-2 depending on distribution of players
-            num_evil = game.roles_distribution.num_demons + game.roles_distribution.num_minions
-            if num_evil == 1:
-                print(f'Tell {player.player_name} that there are 0 pairs')
-            elif num_evil == 2:
-                print(f'Tell {player.player_name} that there are {random.randint(0,1)} pairs') 
-            else:
-                print(f'Tell {player.player_name} that there are {random.randint(0,2)} pairs') 
+    async def send_result(self, player: Player, game: GameManager, night_data: Dict[str, Any]) -> None:
+        await game.command_cog.send_direct_message(player.player_name, f"There are {night_data.get('pairs')} pairs of evil players.")
 
 
-@register_role(RoleName.EMPATH)
-class EmpathBehavior(RoleBehavior):
-    first_night_priority = 7
-    other_night_priority = 8
+@register_role(RoleName.UNDERTAKER)
+class UndertakerBehavior(InfoRoleBehavior):
+    other_night_priority = 7
 
-    async def act(self, player: Player, game: GameManager) -> None:
-        is_reliable: bool = player.status.is_reliable()
-        left_neighbor, right_neighbor = game.get_alive_neighbors(player)
-        evil_count = 0
-        if left_neighbor and left_neighbor.registered_alignment == Alignment.EVIL: evil_count += 1
-        if right_neighbor and right_neighbor.registered_alignment == Alignment.EVIL: evil_count += 1
-        if is_reliable: evil_count = random.choice([0, 1, 2])
-        prompt = f"There are {evil_count}, evil players among you"
-        # TODO: Implement logging
+    async def get_default_trusted(self, player: Player, game: GameManager) -> Dict[str, Any]:
+        if not game.executed_player: return {}
+        executed = game.get_player_by_name(game.executed_player)
+        return {"role": str(executed.registered_role)}
+
+    async def get_manual_trusted(self, player: Player, game: GameManager, default_data: Dict[str, Any]) -> Dict[str, Any]:
+        return default_data
+
+    async def get_default_dishonest(self, player: Player, game: GameManager) -> Dict[str, Any]:
+        if not game.executed_player: return {}
+        # Pick a completely random role that isn't what they actually are
+        executed = game.get_player_by_name(game.executed_player)
+        fake_roles = [r for r in RoleName if r != executed.registered_role]
+        return {"role": str(random.choice(fake_roles))}
+
+    async def get_manual_dishonest(self, player: Player, game: GameManager, default_data: Dict[str, Any]) -> Dict[str, Any]:
+        if not game.executed_player: return {}
+        gm_val = await game.modify_information("Provide false role for executed player", [str(r) for r in RoleName], 1)
+        if gm_val: default_data["role"] = gm_val[0]
+        return default_data
+
+    async def send_result(self, player: Player, game: GameManager, night_data: Dict[str, Any]) -> None:
+        if "role" in night_data:
+            msg = f"The player executed today was the {night_data['role']}."
+            await game.command_cog.send_direct_message(player.player_name, msg)
+
+
+# ==========================================
+# ACTION ROLES (Targeting Pipeline)
+# ==========================================
+
+@register_role(RoleName.MONK)
+class MonkBehavior(ActionRoleBehavior):
+    other_night_priority = 2
+
+    async def get_default_target(self, player: Player, game: GameManager) -> Optional[Player]:
+        # Prompt the PLAYER for their target
+        target_list = get_filtered_players(game, excluded_players={player}, is_alive=True)
+        user_sel = await game.command_cog.dmdropdown(player.player_name, "Who do you protect?", [p.player_name for p in target_list], 1)
+        if user_sel:
+            return game.get_player_by_name(user_sel[0])
+        return None
+
+    async def get_manual_target(self, player: Player, game: GameManager) -> Optional[Player]:
+        # If the GM wants to force a target for the Monk
+        target_list = get_filtered_players(game, excluded_players={player}, is_alive=True)
+        gm_sel = await game.command_cog.dmdropdown(game.game_master, f"Force target for Monk ({player.player_name})", [p.player_name for p in target_list], 1)
+        if gm_sel:
+            return game.get_player_by_name(gm_sel[0])
+        return None
+
+    async def execute_action(self, player: Player, target: Player, game: GameManager) -> None:
+        target.status.protected = True
+        print(f"{target.player_name} protected by Monk.")
+
+
+# ==========================================
+# CUSTOM/HYBRID ROLES (Bypasses Pipelines)
+# ==========================================
 
 @register_role(RoleName.FORTUNE_TELLER)
 class FortuneTellerBehavior(RoleBehavior):
     first_night_priority = 8
     other_night_priority = 9
-    async def act(self, player: Player, game: GameManager):
-        possible_selections: List[Player] = [p for p in game.players if p.status.alive.state == True and p != player]
-        selected_player_names: List[str] = []
-        selected_player_names.append(game.get_user_choice([p.player_name for p in possible_selections], "Select First Player to Divine"))
-        selected_player_names.append(game.get_user_choice([p.player_name for p in possible_selections], "Select Second Player to Divine"))
-        selected_players = [p for p in possible_selections if p.player_name in selected_player_names]
-        for p in selected_players:
-            if p.believed_role == RoleName.IMP:
-                print("There is an Imp among us")
-        print("All is good in the world, no Imps here.")
-@register_role(RoleName.UNDERTAKER)
-class UndertakerBehavior(RoleBehavior):
-    other_night_priority = 7
-    async def act(self, player: Player, game: GameManager):
-        #print(f"\nWake {player.believed_role} ({player.player_name}). Show them the role of todays executed player. Put to sleep.")
-        # TODO: Implement UndertakerBehavior
-        # TODO: Print statements need to be updated. Display class than name in some cases.
-
-        if not game.executed_player:
-            print(f"No player has been executed, Undertaker does nothing")
-
-        is_reliable: bool = not (player.registered_role == RoleName.DRUNK or player.poisoned) # added not since we want is_reliable to be true when player is not Drunk OR is not Poisoned
-        executed_player: Player = game.get_player_by_name(game.executed_player)
-
-        if is_reliable: # not drunk or poisoned
-            if executed_player.registered_role == RoleName.DRUNK:
-                # TODO: English hard. Idk if this sentence makes sense. Should we assume players are playing in person or online. DIADJSAdaosdk
-                print(f"Wake up {player.player_name} and tell them {executed_player.player_name} was a Drunk (or show them the Drunk Token).")
-            else:
-                print(f"Wake up {player.player_name} and tell them {executed_player.player_name} was a {executed_player.registered_role} (or show them the {executed_player.registered_role} Token).")
-        else:
-
-            # TODO: Check this out. Not sure how to give false information
-            role = ""
-            message = f"Wake up {player.believed_role}({player.player_name}) and tell them {executed_player.player_name} was a {role} (or show them the {role} Token)."
-
-            # for the miss information, pick random role? 
-            # can't pick role since information is dependent on game context. Giving a random role might fk over game
-            # have the Game Manager pick role
-            role = input(f"Give false information to {player.believed_role}({player.player_name}). What false role do you want to tell them?\n False Role: ")
-            
-            print(message)
-
-
-@register_role(RoleName.MONK)
-class MonkBehavior(RoleBehavior):
-    other_night_priority = 2
+    
     async def act(self, player: Player, game: GameManager) -> None:
-        target_list = get_filtered_players(game, excluded_players=set([player]))
-        target = await game.command_cog.dmdropdown(player.player_name, "Who do you protect?", [p.player_name for p in target_list], 1)
+        # Custom logic because FT actively queries multiple targets during the night
+        possible_selections = [p for p in game.players if p.status.alive and p != player]
+        
+        sel_1 = await game.command_cog.dmdropdown(player.player_name, "Select First Player to Divine", [p.player_name for p in possible_selections], 1)
+        sel_2 = await game.command_cog.dmdropdown(player.player_name, "Select Second Player to Divine", [p.player_name for p in possible_selections], 1)
+        
+        if not sel_1 or not sel_2: return
+        
+        target_1 = game.get_player_by_name(sel_1[0])
+        target_2 = game.get_player_by_name(sel_2[0])
+        
+        is_reliable = player.status.is_reliable
+        has_demon = False
+
+        if is_reliable:
+            # Check for Demon OR Red Herring
+            if target_1.registered_role in ROLES_DEMONS or target_2.registered_role in ROLES_DEMONS: has_demon = True
+            if target_1.status.red_herring or target_2.status.red_herring: has_demon = True
+        else:
+            # Drunk/Poisoned: Random yes/no
+            has_demon = random.choice([True, False])
+
+        msg = "YES" if has_demon else "NO"
+        await game.command_cog.send_direct_message(player.player_name, f"Demon presence: {msg}")
+
 
 @register_role(RoleName.RAVENKEEPER)
 class RavenkeeperBehavior(RoleBehavior):
     other_night_priority = 6
     async def act(self, player: Player, game: GameManager) -> None:
+        if game.killed_tonight == player.player_name:
+            target_list = get_filtered_players(game, excluded_players={player})
+            sel = await game.command_cog.dmdropdown(player.player_name, "You died! Select a player to view their role:", [p.player_name for p in target_list], 1)
             
-        # drunk can be ravenkeeper but has fake info
-        #if game.killed_tonight == player and player.registered_role == RoleName.RAVENKEEPER:
-        #    print(f"\nWake {player.believed_role} ({player.player_name}). They died! Let them point to a player, show them the role. Put to sleep.")
-            # TODO: Implement RavenkeeperBehavior
-
-        # I FUCKING HATE THESE NEST IF STATEMENTS
-        # but I want to deal with the case where a player is both drunk and poisoned. In this case, the Game Master needs to give information that really fucks the good side.
-
-        random_float = random.random() # float from 0.0 - 1.0
+            if sel:
+                target = game.get_player_by_name(sel[0])
+                if player.status.is_reliable:
+                    await game.command_cog.send_direct_message(player.player_name, f"{target.player_name} is the {target.registered_role}.")
+                else:
+                    fake_role = random.choice([r for r in RoleName if r != target.registered_role])
+                    await game.command_cog.send_direct_message(player.player_name, f"{target.player_name} is the {fake_role}.")
 
 
-        if player.registered_role == RoleName.DRUNK: 
-            if player.poisoned: 
-                print(f"\n{player.believed_role} ({player.player_name}) has died! {player.player_name} is a Drunk and is Poisoned.\n Let them point to a player and give them information that screws the Good team. \nPut them to sleep.")
-            elif random_float <= 0.2: 
-                print(f"\nWake {player.believed_role} ({player.player_name}). They died! Since {player.player_name} is a Drunk and got LUCKY, let them point to a player and show them the right role. Put them to sleep.")
-            else: 
-                print(f"\nWake {player.believed_role} ({player.player_name}). They died! Since {player.player_name} is a Drunk, let them point to a player and show them the wrong role. Put them to sleep.")
-
-        
-        if player.believed_role == RoleName.RAVENKEEPER: # Drunk case, player thinks their a Ravenkeeper
-            print(f"\n{player.believed_role} ({player.player_name}) has died!")
-            picked_player = input(f"Wake up {player.believed_role} ({player.player_name}) and have them point to another player. \n Who did they pick? ")
-
-
+# ==========================================
+# PASSIVE / DAY ROLES (Do nothing at night)
+# ==========================================
 
 @register_role(RoleName.VIRGIN)
-class VirginBehavior(RoleBehavior):
-    async def act(self, player: Player, game: GameManager) -> None:
-        # TODO: Implement Virgin
-        # only need to check if not drunk or poisoned and if nominator is aa townfolk
-        
-        is_reliable: bool = not (player.registered_role == RoleName.DRUNK or player.poisoned)
-        nominator: Player =  game.get_player_by_name(game.nominator)
-
-        if is_reliable:
-            if nominator.registered_role in ROLES_TOWNSFOLK:
-                nominator.alive = False
-                print(f"{nominator.believed_role}({nominator.player_name}) has died.") 
-
-        # dont need to check drunk or poisoned since they will die either way during the vote (if majority voted to execute)
+class VirginBehavior(PassiveBehavior):
+    pass # Triggered during nominations in the Day Phase
 
 @register_role(RoleName.SLAYER)
-class SlayerBehavior(RoleBehavior):
-    async def act(self, player: Player, game: GameManager) -> None:
-        # TODO: Implement Slayer
-
-        is_reliable: bool = not (player.registered_role == RoleName.DRUNK or player.poisoned)
-
-        if is_reliable:
-            print(f"\nWake {player.believed_role}({player.player_name}) up.")
-            target: Player = game.get_player_by_name()
-            if target.registered_role == RoleName.IMP:
-                target.alive = False
-                print(f"\n {player.believed_role}({player.player_name}) has killed the Imp!")
-            else: 
-                print(f"{player.believed_role}({player.player_name}) has targeted someone who is not the Imp, nothing happens")
-
-        # ignore drunk or poison case since nothing would happen either way.
-        else:
-            if player.registered_role == RoleName.DRUNK:
-                print(f"\nSince {player.believed_role}({player.player_name}) is actually a Drunk, Nothing happens.")
-            else:
-                print(f"\nSince {player.believed_role}({player.player_name}) is poisoned, Nothing happens.")
-
-
+class SlayerBehavior(PassiveBehavior):
+    pass # Triggered via bot command during the Day Phase
 
 @register_role(RoleName.SOLDIER)
-class SoldierBehavior(RoleBehavior):
-    first_night_priority = 100 # not sure what to set this as
-    other_night_priority = 100 # not sure what to set this as
-    async def act(self, player: Player, game: GameManager) -> None:
-        # TODO: Implement Soldier
-        
-        is_reliable: bool = not (player.registered_role == RoleName.DRUNK or player.poisoned)
-
-        Status
-        if is_reliable:
-            player.protected = True
-        else: # if Drunk, they are not protected. If poisoned, they are not protected from Imp's Attack
-            player.protected = False
+class SoldierBehavior(PassiveBehavior):
+    pass # Status handled by Imp's kill check
 
 @register_role(RoleName.MAYOR)
-class MayorBehavior(RoleBehavior):
-    async def act(self, player: Player, game: GameManager) -> None:
-        # TODO: Implement Mayor
-        
-        if len([p for p in game.players if p.alive == True]) != 3:
-            return
-
-        if game.executed_player:
-            print("There has been an execution, Mayor's ability does not work.")
-            return
-
-        is_reliable: bool = not (player.registered_role == RoleName.DRUNK or player.poisoned)
-
-        if is_reliable:
-            game.game_over = True
-            print(f"3 players are remaining and no Execution has occurred. Good Wins due to Mayor's ability")
-        else:
-            if player.registered_role == RoleName.DRUNK:
-                print(f"3 players are remaining and no Execution has occurred. But Mayor is DRUNK! Nothing happens")
-            if player.poisoned:
-                print(f"3 players are remaining and no Execution has occurred. But Mayor is POISONED! Mayor's ability does not work!")
-        
-
-
-# NOTE
-# how to deal with fake info????
-# How do you figure out night priorities????????
-# dont want to take power away from Game Master. Let them pick misinformation and have impact on game
-
-# Need to clear game.executed_player at the beginning of next round
+class MayorBehavior(PassiveBehavior):
+    pass # Triggered at the end of the execution phase

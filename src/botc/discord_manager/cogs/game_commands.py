@@ -19,7 +19,7 @@ from botc.discord_manager.views import JoinLobbyView, DropdownView
 from botc.discord_manager.polling import PollManager
 
 from botc import Player
-from botc.enums import RoleName
+from botc.enums import RoleName, RoleClass
 
 from botc import Player
 from botc import Alignment
@@ -85,8 +85,12 @@ class GameCommands(commands.Cog):
             ephemeral=True
         )
 
-    async def dmdropdown(self, user_name: str, message_text: str, dropdown_options: List[str], max_selection: int) -> Optional[List[str]]:
-        if len(dropdown_options) > 25:
+    async def dmdropdown(self, user_name: str, message_text: str, options: List[str], max_selection: int) -> Optional[List[str]]:
+        options=list(set(options))
+        if len(options) > 25:
+            print("Too Many Options!")
+            print(options)
+            exit()
             raise ValueError("Dropdowns must have <= 25 options")
             
         clean_name: str = user_name.lstrip('@').lower()
@@ -100,7 +104,7 @@ class GameCommands(commands.Cog):
             print(f"❌ Could not find user with name '{user_name}' in cache.")
             return None
             
-        view = DropdownView(options=dropdown_options, max_selection=max_selection)
+        view = DropdownView(options=options, max_selection=max_selection)
         
         try:
             message: discord.Message = await user.send(content=message_text, view=view)
@@ -120,6 +124,7 @@ class GameCommands(commands.Cog):
         return view.selected_values
 
     async def dmpoll(self, user_name: str, poll_message: str, poll_options: List[str], max_selection: int) -> Optional[List[str]]:
+        poll_options=list(set(poll_options))
         if len(poll_options) > 10 or max_selection == 1:
             return await self.dmdropdown(user_name, poll_message, poll_options, max_selection)
         
@@ -250,9 +255,16 @@ class GameCommands(commands.Cog):
     @app_commands.command(name="start_game", description="[Admin] Close the lobby and deal roles.")
     @app_commands.default_permissions(manage_roles=True)
     async def start_game(self, interaction: discord.Interaction) -> None:
-        self.game.players.append(Player("iiiii5184", RoleName.WASHERWOMAN, RoleName.WASHERWOMAN, Alignment.GOOD))
-        self.game.players.append(Player("microsina", RoleName.WASHERWOMAN, RoleName.WASHERWOMAN, Alignment.GOOD))
-        print("Hiiiii i added them ppl")
+        ROLES_DEMONS = RoleName.get_by_class(RoleClass.DEMONS)
+        ROLES_MINIONS = RoleName.get_by_class(RoleClass.MINIONS)
+        ROLES_MINIONS.remove(RoleName.POISONER)
+        ROLES_OUTSIDERS = RoleName.get_by_class(RoleClass.OUTSIDERS)
+        ROLES_TOWNSFOLK = RoleName.get_by_class(RoleClass.TOWNSFOLK)
+        # Testing End Start
+        targets = ROLES_DEMONS + ROLES_MINIONS + ROLES_OUTSIDERS + ROLES_TOWNSFOLK
+        for r in targets:
+            self.game.players.append(Player("iiiii5184", r, r, Alignment.GOOD))
+        # Testing End
 
         num_players: int = len(self.game.player_names)
         

@@ -73,7 +73,9 @@ class GameManager:
         chosen_minions = random.sample(self.ROLES_MINIONS, minion_count)
 
         if RoleName.BARON in chosen_minions:
-            BARON_OUTSIDER_OFFSET = 3
+            # Note: In standard Blood on the Clocktower, Baron adds 2 Outsiders, not 3!
+            # Change this to 2 if you want to follow standard Trouble Brewing rules.
+            BARON_OUTSIDER_OFFSET = 2 
             outsider_count += BARON_OUTSIDER_OFFSET
             townsfolk_count -= BARON_OUTSIDER_OFFSET
 
@@ -99,32 +101,37 @@ class GameManager:
 
         assigned_players: List[Player] = []
         for player_name, role_enum in zip(self.player_names, selected_roles):
-            believed_role = drunk_fake_role if role_enum == RoleName.DRUNK else None
-            registered_role = spy_fake_role if role_enum == RoleName.SPY else None
-            registered_alignment = Alignment.GOOD if role_enum == RoleName.SPY and spy_fake_role else None
+            
+            # The Drunk thinks they are a Townsfolk, otherwise everyone believes their actual role
+            believed_role = drunk_fake_role if role_enum == RoleName.DRUNK else role_enum
+            
+            # The Spy registers falsely to abilities, otherwise everyone registers as their actual role
+            registered_role = spy_fake_role if role_enum == RoleName.SPY else role_enum
+            
+            # Spy registers as Good, everyone else passes None so Player.__init__ sets their default
+            registered_alignment = Alignment.GOOD if role_enum in self.ROLES_TOWNSFOLK+self.ROLES_OUTSIDERS else Alignment.EVIL
 
             assigned_players.append(
-                Player(player_name, role_enum, believed_role, registered_role, registered_alignment)
+                Player(player_name, believed_role, registered_role, registered_alignment)
             )
 
         return assigned_players
     
     def resolve_temporary_conditions(self):
         for player in self.players:
-            player.protected=False
-            player.poisoned=False
+            player.status.protected=False
+            player.status.poisoned=False
 
     async def start_game(self, interaction: discord.Interaction):
-        # self.players.append(Player("@iiiii5184",RoleName.WASHERWOMAN, RoleName.WASHERWOMAN, RoleName.WASHERWOMAN, Alignment.GOOD))
-        # self.players.append(Player("@microsina",RoleName.WASHERWOMAN, RoleName.WASHERWOMAN, RoleName.WASHERWOMAN, Alignment.GOOD))
-        self.roles_distribution = RoleDistributor(self.player_names)
-        self.players = self.assign_roles()
+        # self.roles_distribution = RoleDistributor(self.player_names)
+        # self.players = self.assign_roles()
 
         self.players_alive = self.players
 
         await self.message_roles_to_players()
 
         for player in self.get_wake_order(is_first_night=True):
+            print("Calling " + player.registered_role.role_class.__str__())
             await player.take_action(self)
 
         while(self.game_over != True):
@@ -166,13 +173,13 @@ class GameManager:
         num_players = len(self.players)
 
         right_idx = (index + 1) % num_players
-        while not self.players[right_idx].alive:
+        while not self.players[right_idx].status.alive:
             right_idx = (right_idx + 1) % num_players
             if right_idx == index: break
         right_neighbor = self.players[right_idx]
 
         left_idx = (index - 1) % num_players
-        while not self.players[left_idx].alive:
+        while not self.players[left_idx].status.alive:
             left_idx = (left_idx - 1) % num_players
             if left_idx == index: break
         left_neighbor = self.players[left_idx]
@@ -204,9 +211,9 @@ class GameManager:
     def get_board_str(self) -> str:
         output_str = "```\n" + "="*55 + "\n"
         for i, player in enumerate(self.players):
-            status = "Alive" if player.alive else "DEAD"
-            poison_str = " [POISONED]" if player.poisoned else ""
-            protect_str = " [PROTECTED]" if player.protected else ""
+            status = "Alive" if player.status.alive else "DEAD"
+            poison_str = " [POISONED]" if player.status.poisoned else ""
+            protect_str = " [PROTECTED]" if player.status.protected else ""
 
             if player.registered_role == RoleName.DRUNK:
                 role_info = f"Drunk (Thinks: {player.believed_role})"

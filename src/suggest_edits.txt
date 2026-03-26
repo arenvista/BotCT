@@ -1,0 +1,946 @@
+=== botc/enums.py ===
+1) Purpose of the file
+- Centralizes game-related enumerations and a status model for a Blood on the Clocktower–style engine.
+- Provides human-friendly display helpers and utilities to group/filter roles by class.
+- Encapsulates player condition effects (poisoned, drunk, protected, etc.) with derived logic for reliability and protection.
+
+2) Key classes/functions
+- Status (dataclass)
+  - Fields: poisoned, drunk, protected, alive, red_herring (all bools; defaults set).
+  - is_reliable (property): True iff not poisoned and not drunk.
+  - is_protected (property): True iff protected and not poisoned (poison negates protection).
+  - toggle(attr_name): Dynamically toggles a named flag; raises ValueError if unknown.
+- Alignment (Enum)
+  - Members: GOOD, EVIL.
+  - __str__: Title-cased name for display.
+- RoleClass (Enum)
+  - Members: GAMEMASTER, DEMONS, MINIONS, OUTSIDERS, TOWNSFOLK.
+  - display_name: Human-readable name (underscores to spaces, title-cased).
+  - __str__: Returns display_name.
+- RoleName (Enum)
+  - Extends Enum members with extra attribute role_class via custom __new__.
+  - Members: GAMEMASTER; Minions (POISONER, SPY, BARON, SCARLET_WOMAN); Outsiders (BUTLER, DRUNK, RECLUSE, SAINT); Townsfolk (WASHERWOMAN, LIBRARIAN, INVESTIGATOR, CHEF, EMPATH, FORTUNE_TELLER, UNDERTAKER, MONK, RAVENKEEPER, VIRGIN, SLAYER, SOLDIER, MAYOR); Demons (IMP).
+  - display_name and __str__: Same formatting as RoleClass.
+  - get_by_class(target_class): Returns list of RoleName members matching a given RoleClass.
+
+3) Important logic or algorithms
+- Derived status semantics:
+  - Reliability is strictly invalidated by poisoned or drunk.
+  - Protection is invalidated by poisoned (even if protected is True).
+- Enum with payload pattern:
+  - RoleName.__new__ stores an int value and attaches role_class metadata per member, enabling quick grouping/filtering of roles.
+- Consistent display transformation:
+  - __str__ and display_name unify how enums render to user-friendly strings.
+- Role grouping:
+  - RoleName.get_by_class provides a simple query mechanism for role classification.
+
+4) Notable dependencies or patterns
+- dataclasses.dataclass for a lightweight, mutable state container (Status).
+- enum.Enum with custom __new__ to add per-member attributes (RoleName → role_class).
+- Type hints (typing.List, RoleClass annotations) for clarity and tooling support.
+- Defensive API design in Status.toggle with attribute existence check and explicit error on invalid keys.
+- Separation of concerns:
+  - Alignment is defined but decoupled from RoleName/RoleClass (no direct mapping enforced).
+  - Role classifications and IDs are explicit, making it easy to extend by adding new Enum members with (value, RoleClass).
+
+=== botc/__init__.py ===
+1) Purpose of the file
+- Acts as the package initializer for the Blood on the Clocktower (botc) core engine.
+- Provides a clean, stable public API by re-exporting commonly used types (enums and Player) at the package level so users can do from botc import Player, Alignment, etc.
+
+2) Key classes/functions (with brief descriptions)
+- Alignment (from .enums): Enum representing player alignment/faction.
+- RoleClass (from .enums): Enum categorizing roles (e.g., Townsfolk, Outsider, Minion, Demon).
+- RoleName (from .enums): Enum of specific role identifiers/names.
+- Status (from .enums): Enum for player or role status flags.
+- Player (from .player): Core domain object representing a game participant.
+
+3) Important logic or algorithms
+- No business logic or algorithms here. The file’s responsibility is strictly to expose selected symbols from submodules for easier import.
+
+4) Notable dependencies or patterns
+- Uses relative imports to re-export internal modules’ symbols (facade pattern for package API).
+- __all__ is present but commented out; thus, star-imports (from botc import *) will default to exporting all non-underscore names currently imported/defined in this module. Uncommenting and completing __all__ would explicitly constrain the public API.
+- The trailing lines “ERROR READING FILE: 'str' object has no attribute 'read_text'...” appear to be accidental artifact text and would cause a SyntaxError if present in the actual file; they should be removed.
+
+=== botc/player.py ===
+1) Purpose of the file
+- Defines the Player model for a Blood on the Clocktower-like game. It encapsulates identity, perceived vs actual role/alignment, current status, voting token, and delegates in-game actions to a role-specific behavior.
+
+2) Key classes/functions
+- class Player
+  - __init__(player_name, believed_role, registered_role, registered_alignment): Initializes player identity, resolves alignment (falls back to a default derived from the registered role if not provided), creates a Status, selects a RoleBehavior from BEHAVIOR_MAP based on believed_role (default PassiveBehavior), and sets a vote_token.
+  - show_role(): Returns a user-facing string informing the player of their believed_role.
+  - _default_alignment(): Returns Alignment.EVIL if the registered_role.role_class is DEMONS or MINIONS; otherwise Alignment.GOOD.
+  - take_action(game): Async. If the player is dead and does not believe they are the Ravenkeeper, do nothing. Otherwise, await the role_behavior’s act(self, game).
+  - _to_dict(): Serializes selected fields to a dict using enum .name values and status booleans.
+
+3) Important logic or algorithms
+- Behavior resolution via Strategy pattern: role_behavior = BEHAVIOR_MAP.get(believed_role, PassiveBehavior()) so actions are driven by the role the player believes they have.
+- Dead-action gating: Disallows actions for dead players except those believing they are Ravenkeeper (special-case night action upon death).
+- Alignment inference: If no registered_alignment provided, derive it from the registered_role’s RoleClass (demons/minions → EVIL; others → GOOD).
+- Serialization: Produces a simple dict of names/flags for external use.
+- Notable caveats:
+  - _to_dict duplicates the "registered_role" key (second occurrence overwrites the first; functionally harmless but redundant).
+  - registered_alignment is typed as Alignment but treated as optional in __init__ (should likely be Optional[Alignment] with a default of None).
+  - role_behavior is fixed at init; if believed_role changes later, behavior won’t auto-update.
+  - Status is instantiated from botc.enums, which is atypical naming for a non-enum class (assumes a class with alive/poisoned/protected attributes).
+
+4) Notable dependencies or patterns
+- botc.enums: Alignment, RoleClass, RoleName, Status (enums plus a status holder).
+- botc.behaviors: BEHAVIOR_MAP (role → behavior mapping) and PassiveBehavior (no-op default).
+- Async integration: take_action and RoleBehavior.act are coroutines to fit an asynchronous GameManager loop.
+- Type-hint hygiene and circular import avoidance: from __future__ import annotations and TYPE_CHECKING imports (GameManager, RoleBehavior) used only for hints.
+
+=== botc/discord_manager/polling.py ===
+1) Purpose of the file
+- Orchestrates Discord-based polling for a Blood on the Clocktower game. It runs:
+  - A Game Master volunteer poll (using Discord’s native Polls) and randomly selects a GM from eligible volunteers.
+  - A daily execution vote (custom dropdown UI) and updates game state based on majority results.
+
+2) Key classes/functions
+- PollManager(game: GameManager)
+  - Holds a reference to the game state (GameManager) and coordinates polling flows.
+
+- async run_gamemaster_poll(interaction, allowed_player_names) -> Optional[discord.Message]
+  - Validates the command is used in a text channel and sends ephemeral status.
+  - Creates a public thread and posts a Discord Poll (“Do you want to be a GM?” with Yes/No).
+  - Periodically refetches the poll message, ending early if the total number of votes reaches the number of allowed players or after a timeout (4 minutes).
+  - Ends the poll, collects all “Yes” voters, filters them to allowed players (by normalized username/global_name), randomly selects one as GM, and updates GameManager:
+    - Sets game_master to the selected username.
+    - Attempts to remove the selected GM from game.players and game.players_alive (if present).
+    - Removes their name from game.player_names (string list).
+  - Posts the outcome in the thread. Returns the poll message.
+
+- async run_execution_poll(interaction, allowed_player_ids) -> Optional[discord.Message]
+  - Validates text channel, sends ephemeral status, creates a public thread.
+  - Sends an embed with an ExecutionView dropdown (choices: alive players + “Skip Vote”).
+  - Waits up to 4 minutes, or until all allowed players have voted (tracked via view.dropdown.votes).
+  - Disables the dropdown, edits the message, and tallies votes:
+    - Counts only votes from allowed_player_ids.
+    - Results keyed by player_name and “Skip Vote”.
+    - Determines execution only if a target has > 50% of valid votes cast.
+  - If executed, sets the player’s alive status to False and records executed_player; otherwise, announces no execution.
+  - Prints the board state for debugging and returns the message.
+
+3) Important logic or algorithms
+- Interaction response handling: Uses interaction.response vs interaction.followup based on is_done() to avoid double-response errors.
+- Thread isolation: Each poll occurs in a dedicated public thread to reduce channel clutter.
+- GM poll monitoring:
+  - Loops every 5s to refetch the poll message; handles discord.HTTPException safely.
+  - Early exit when the total (Yes+No) votes meet the number of allowed players or when timeout hits.
+  - Ends the poll programmatically and refetches on error if needed.
+- Candidate filtering for GM:
+  - Normalizes allowed names (strip leading @, lowercase).
+  - Compares against user.name and user.global_name (lowercased) to qualify volunteers.
+  - Random selection among qualified volunteers.
+- Execution vote tally:
+  - Counts only votes from allowed voters.
+  - Majority threshold is strictly > 50% of valid votes cast (not of living players).
+  - “Skip Vote” acts as a non-execution option if it wins a majority.
+  - Disables UI after completion to freeze results.
+
+4) Notable dependencies or patterns
+- Discord.py features:
+  - discord.Interaction, discord.TextChannel, discord.Thread (public_thread), discord.Embed.
+  - discord.Poll, PollAnswer.voters(), and Message.end_poll() (native Poll API).
+  - Custom UI: ExecutionView (from botc.discord_manager.views) with a dropdown that exposes votes.
+- Async patterns: asyncio.sleep polling loops for timeouts and message refetching.
+- GameManager integration (implied API):
+  - Attributes: day_counter, players, players_alive, player_names, executed_player, game_master.
+  - Methods: get_player_by_name(name), get_board_str().
+- Data handling:
+  - Uses usernames/global_name (string matching) for GM eligibility; uses player_name strings for execution targets.
+  - allowed_player_ids expected to match keys in view.dropdown.votes (likely user IDs as strings).
+- Error handling:
+  - HTTPException-safe message fetching loop.
+  - Graceful handling if player lookup fails during state updates.
+- Misc:
+  - Poll UI duration (set to 1 hour) differs from internal wait (4 minutes); logic ends the poll early.
+  - Early-termination condition in GM poll considers all votes (including non-allowed), while selection filters to allowed voters.
+
+=== botc/discord_manager/views.py ===
+1) Purpose of the file
+- Defines Discord UI components (views, selects, and a button) used by the bot to manage player interactions in a Blood on the Clocktower game: joining a lobby, casting execution votes, and making generic dropdown selections.
+
+2) Key classes/functions
+- ExecutionDropdown (discord.ui.Select)
+  - Dynamically builds a single-select dropdown from alive players plus a “Skip Vote” option.
+  - Records votes in-memory as {username: chosen_option}.
+  - Sends an ephemeral confirmation to the voter on selection.
+- ExecutionView (discord.ui.View)
+  - Container view that adds an ExecutionDropdown; timeout=None (persistent until manually stopped/removed).
+- JoinLobbyView (discord.ui.View)
+  - Provides a “Join Game” button (custom_id="join_game_btn").
+  - On click, adds the Discord username to GameManager.player_names if not already present and acknowledges via ephemeral message.
+- DropdownView (discord.ui.View)
+  - Generic dropdown supporting up to 25 options and configurable max selections.
+  - On selection: stores selected values, disables the select to lock choices, edits the message to confirm, and stops the view (to unblock awaiting code).
+
+3) Important logic or algorithms
+- Dynamic option construction for execution voting using alive_players[i].player_name and an explicit “Skip Vote.”
+- Per-user vote tracking keyed by interaction.user.name (display name), not ID; simple in-memory dict on the Select instance.
+- Generic multi-select flow:
+  - Capture self.select.values
+  - Disable the select (prevents changes)
+  - Edit the message to reflect finalization
+  - Call self.stop() to end view waiting loops
+- Lobby join deduplication by string username in GameManager.player_names.
+
+4) Notable dependencies or patterns
+- Uses discord.py v2 interactions/UI:
+  - Subclassing discord.ui.Select and discord.ui.View
+  - @discord.ui.button decorator for the join action
+  - Ephemeral responses for user-only confirmations
+  - Message edits via interaction.response.edit_message for view updates
+- TYPE_CHECKING guard to import GameManager only for type hints, avoiding runtime import cycles.
+- Constraints and choices:
+  - Dropdown options capped at 25 (Discord limit)
+  - min_values=1 enforces at least one selection
+  - timeout=None creates persistent views that must be managed explicitly (and typically require custom_id for persistence across restarts; provided for the button).
+
+=== botc/discord_manager/__init__.py ===
+1) Purpose of the file
+- Acts as the package initializer for botc.discord_manager, re-exporting selected symbols to present a clean, centralized public API. It enables consumers to import core components directly from botc.discord_manager rather than its submodules.
+
+2) Key classes/functions (with brief descriptions)
+- BotManager (from .bot): Re-exported manager for the Discord bot’s lifecycle and coordination (actual implementation in bot.py).
+- JoinLobbyView (from .views): Re-exported UI view for a “join lobby” interaction (implementation in views.py).
+- PollManager (from .polling): Re-exported manager for creating/handling polls (implementation in polling.py).
+
+3) Important logic or algorithms
+- None in this module. It only performs relative imports to make selected symbols available at the package level. Note that this eagerly imports the submodules at package import time, so any heavy initialization or side effects in those modules will occur when importing botc.discord_manager.
+
+4) Notable dependencies or patterns
+- Pattern: Facade/aggregator via re-exports to define the package’s public surface.
+- Structure: Separation of concerns across submodules (bot, views, polling) while exposing a stable API.
+- Likely ecosystem (inferred from names): discord.py (e.g., discord.ui.View for views) and asyncio patterns in bot/polling modules, though specifics are in the submodules.
+- Note: The trailing “ERROR READING FILE...” lines appear to be tooling output, not valid Python code in this file.
+
+=== botc/discord_manager/bot.py ===
+1) Purpose of the file
+- Defines the central Discord bot manager for the project, wiring a GameManager into a discord.py Bot.
+- Configures intents, registers a command Cog, and performs fast guild-specific slash-command syncing for development/testing.
+- Provides basic startup logging when the bot is ready.
+
+2) Key classes/functions
+- BotManager(commands.Bot)
+  - __init__(game: GameManager): 
+    - Stores a GameManager instance on the bot.
+    - Configures discord Intents (enables message_content and members) and sets a legacy command prefix ("!").
+    - Initializes the base commands.Bot.
+  - setup_hook():
+    - Adds the GameCommands Cog (GameCommands(self, self.game)).
+    - Loads environment variables (.env) and attempts to construct a test guild object from SERVER_ID; falls back to a hardcoded guild ID if anything fails.
+    - Copies global app commands to that guild and syncs them (fast local iteration).
+    - Prints a status message.
+  - on_ready():
+    - Validates self.user is not None and prints a readiness message.
+
+3) Important logic or algorithms
+- Intents configuration:
+  - Enables privileged intents: message_content and members (requires them to be enabled in the Discord Developer Portal).
+- Fast slash-command syncing for a single guild:
+  - Uses self.tree.copy_global_to(guild=...) and await self.tree.sync(guild=...) to accelerate command availability during development (guild syncs propagate quickly vs. global).
+- Environment configuration and fallback:
+  - Uses python-dotenv to load SERVER_ID from .env.
+  - Wraps the creation of discord.Object(id=os.getenv("SERVER_ID")) in a broad try/except; on any error (including missing/invalid env var), falls back to a hardcoded guild ID.
+- Type checking optimization:
+  - Imports GameManager only for type checking via TYPE_CHECKING to avoid runtime import/circulars.
+
+4) Notable dependencies or patterns
+- discord.py v2 patterns:
+  - commands.Bot with setup_hook for async initialization and app command tree operations.
+  - Cog-based command organization (GameCommands).
+- Configuration:
+  - python-dotenv (load_dotenv) and os.getenv for environment-based guild selection.
+- Design/implementation notes:
+  - Mixes legacy prefix commands (command_prefix="!") with application command tree operations (slash commands); likely supports both or uses Cog-defined app commands.
+  - Uses discord.Object to reference a guild by ID without fetching it.
+  - Broad except around env loading and guild object creation ensures a default guild is always used but hides specific failures; id parsing ultimately relies on discord.Object(int(...)) conversion.
+  - Simple print-based logging instead of the logging module.
+
+=== botc/encounters/enums.py ===
+1) Purpose of the file
+- Centralizes string constants that represent encounter event types, likely used system-wide to classify or dispatch different kinds of events in the encounters subsystem.
+
+2) Key classes/functions (with brief descriptions)
+- No classes or functions are defined.
+- Module-level constants:
+  - NULL_EVENT_ENUM = "null_event": Sentinel/placeholder event type (e.g., “no-op” or default).
+  - NULL_EVENT_CHILD_ENUM = "null_event_child": Variant for a child/sub-event context that represents a no-op.
+  - NULL_EVENT_ANTI_CHILD_ENUM = "null_event_anti_child": Complementary sentinel to distinguish non-child/anti-child cases.
+  - ONESHOT_EVENT_ENUM = "oneshot_event": Event that should trigger only once.
+  - FLAVOR_TEXT_EVENT_ENUM = "flavor_text_event": Narrative-only event with no mechanical effect.
+
+3) Important logic or algorithms
+- None present. The file is exclusively definitions of string constants.
+
+4) Notable dependencies or patterns
+- No imports or external dependencies.
+- Pattern: Uses plain string constants as an “enum.” This is simple and serialization-friendly (e.g., JSON), but lacks type-safety and typo protection.
+  - Potential improvements:
+    - Use enum.Enum for stronger guarantees and IDE support.
+    - Provide typing via Literal types or define a Union of allowed values.
+    - Group allowed values into a frozenset for validation.
+- Issue to address: The file content includes non-Python text at the end:
+  - ERROR READING FILE: 'str' object has no attribute 'read_text'ERROR READING FILE: 'str' object has no attribute 'read_text'
+  - This will cause a SyntaxError if imported; it should be removed from the source.
+
+=== botc/encounters/base.py ===
+1) Purpose of the file
+- Defines a base framework for “encounters” that can be resolved asynchronously and are gated by dependencies and anti-dependencies.
+- Provides a global registry and utilities to compute which encounters are currently possible/impossible based on other encounters’ resolution state.
+
+2) Key classes/functions
+- ENCOUNTER_MAP: Global dict[str, Encounter] storing a single instantiated Encounter per registered name.
+- register_encounter(encounter_name, dependency_names, anti_dependency_names):
+  - Class decorator that eagerly instantiates the decorated class with the given name and dependency name lists, and registers the instance in ENCOUNTER_MAP.
+  - Returns the class unchanged; registration happens as a side effect at import time.
+- class Encounter(ABC):
+  - __init__(name, dependency_names, anti_dependency_names):
+    - Stores name and dependency name lists.
+    - Initializes dependency object lists (dependencies, anti_dependencies), and state flags: impossible, parents_resolved, resolved.
+    - Optional metadata: flavor_text, image (PIL Image).
+  - async resolve(...): Abstract; subclasses implement encounter resolution and should set self.resolved = True when done.
+  - __str__(): Debug-friendly string with name, parents_resolved, impossible.
+  - __bool__(): Encounter is truthy only when parents_resolved is True and impossible is False (impossible takes precedence over possible).
+- update_possibilities():
+  - Recomputes, for each registered encounter:
+    - impossible: based on anti_dependencies’ resolved states (see logic below).
+    - parents_resolved: True only if all dependencies are resolved (or there are none).
+- reset_resolved():
+  - Resets impossible, parents_resolved, resolved to False for all registered encounters (useful for tests).
+
+3) Important logic or algorithms
+- Possibility semantics:
+  - parents_resolved is True iff all dependencies are resolved (logical AND across dependencies). If no dependencies, it becomes True.
+  - impossible is computed from anti_dependencies:
+    - Current code: impossible becomes True only if there is at least one anti-dependency and all anti-dependencies are resolved; it is False if any anti-dependency is not resolved, or if there are none.
+    - Comment intent vs. implementation mismatch: The comment says “if any anti-dependency resolves, this encounter becomes impossible,” which would be logical OR; the implementation uses logical AND (all must be resolved) to mark impossible. This is likely a bug or design discrepancy.
+- Truthiness:
+  - __bool__ enforces “possible” as parents_resolved AND NOT impossible, giving impossible precedence.
+- Registry lifecycle:
+  - The decorator creates a singleton instance per encounter at import time. Dependency wiring by names to actual Encounter instances must occur elsewhere (not provided here). Until wired, dependencies/anti_dependencies remain empty, which makes encounters appear possible (parents_resolved=True, impossible=False) after update_possibilities.
+
+4) Notable dependencies or patterns
+- Patterns:
+  - Global registry of singleton-like encounter instances keyed by name.
+  - Decorator-based eager registration/instantiation.
+  - Name-based dependency injection: stores dependency_names/anti_dependency_names alongside object lists; expects an external linking step.
+  - Overwrites silently on duplicate names in ENCOUNTER_MAP (no guard).
+  - State recomputation is O(N * (deps + anti_deps)) across all encounters; no incremental or topo-sorted update.
+- Libraries/typing:
+  - abc.ABC and abstractmethod for extensibility.
+  - Asynchronous resolve method (async/await friendly).
+  - PIL.Image for optional image metadata (type only in this module).
+  - __future__.annotations enables forward references in type hints.
+  - random is imported but unused in this file (likely for subclasses).
+
+=== botc/encounters/deck.py ===
+1) Purpose of the file
+- Defines a deck system for “encounters” in a game. It loads a decklist from packaged JSON, represents encounter weighting via multiple “cards” pointing to the same Encounter, enforces dependency gating when drawing (via Encounter fields and a global update_possibilities), and tracks resolved vs unresolved cards.
+
+2) Key classes/functions
+- EncounterCard
+  - Lightweight wrapper around a specific Encounter instance. Multiple cards can reference the same Encounter to model rarity/weighting.
+- Deck.from_json(json_file_name)
+  - Factory that reads a decklist JSON from the botc.decklists package (ensuring a .json extension).
+  - Expects keys: "count_list" (List[int]) and "encounter_name_list" (List[str]).
+  - Maps encounter names to Encounter instances via ENCOUNTER_MAP and constructs a Deck.
+- Deck.__init__(encounter_list, count_list)
+  - Builds the unresolved card list by replicating EncounterCard entries per count; initializes resolved list empty.
+  - Calls update_possibilities() to set initial eligibility/impossibility based on current Encounter states.
+- Deck.draw_card()
+  - Filters unresolved cards to those whose Encounter has parents_resolved == True and impossible == False.
+  - Randomly selects one, removes it from unresolved, marks its Encounter.resolved = True, appends to resolved list, calls update_possibilities(), and returns the card.
+- Deck.__str__()
+  - Summarizes the unresolved and resolved lists by Encounter name frequency.
+- Deck.__len__()
+  - Returns total number of cards across both unresolved and resolved lists (i.e., original deck size, not remaining drawables).
+- Deck.__bool__()
+  - True if there is at least one unresolved card (does not check if it’s drawable).
+
+3) Important logic or algorithms
+- Weighted selection by duplication
+  - Rarity is modeled by duplicating EncounterCard entries for the same Encounter; selection among eligible cards is uniform, making duplicates increase draw probability.
+  - All duplicated cards reference the same Encounter object (from ENCOUNTER_MAP), so marking one as resolved affects all duplicates (their Encounter state changes simultaneously).
+- Gating via Encounter state
+  - Eligibility to draw is controlled by Encounter.parents_resolved and Encounter.impossible (and indirectly by Encounter.resolved through update_possibilities()).
+  - update_possibilities() is called after deck construction and after each draw to recompute which encounters are possible given dependency/resolution changes.
+- Potential edge cases
+  - draw_card() will fail (random.choice on empty list) if no unresolved cards are currently eligible (e.g., all remaining are impossible), even though __bool__ may still return True.
+  - __len__ reports total deck size rather than remaining-eligible or remaining-unresolved size, which could be misleading.
+  - __bool__ does not reflect eligibility; it is effectively bool(unresolved_encounter_card_list).
+
+4) Notable dependencies or patterns
+- External game state and singletons
+  - Relies on ENCOUNTER_MAP (name -> Encounter) and a global update_possibilities() that mutates Encounter.impossible/parents_resolved based on current resolutions. This implies Encounter instances are shared singletons across the deck.
+- Packaged resource loading
+  - Uses importlib.resources.files("botc.decklists").joinpath(...).open("r") to load JSON decklists bundled with the package (Python 3.9+ style).
+- JSON decklist schema
+  - Assumes two parallel arrays: encounter_name_list and count_list. No explicit length/consistency validation in this file.
+- Type hints and simple data wrappers
+  - Employs typing.List annotations; EncounterCard is a minimal wrapper rather than a dataclass.
+
+=== botc/encounters/__init__.py ===
+1) Purpose of the file
+- Centralizes and finalizes initialization of the encounters subsystem.
+- Ensures all encounter objects are registered, then resolves their dependency graphs by converting string-based references to actual object references.
+- Computes derived state (via update_possibilities) after dependencies are linked.
+- Re-exports Deck for external use (botc.encounters.Deck).
+
+2) Key classes/functions (as used/exported by this module)
+- ENCOUNTER_MAP (from .base): Global registry mapping encounter names (str) to encounter instances. Each instance is expected to expose:
+  - dependency_names: list[str] of encounter names it depends on.
+  - anti_dependency_names: list[str] of encounter names it should not co-occur with.
+  - dependencies: list[Encounter] to be populated with actual objects.
+  - anti_dependencies: list[Encounter] to be populated with actual objects.
+- update_possibilities (from .base): Post-linking routine that likely computes which encounters are valid/eligible given the resolved dependencies/anti-dependencies.
+- Deck (from .deck): Exposed after setup; likely uses ENCOUNTER_MAP to construct playable/available encounter decks.
+
+3) Important logic or algorithms
+- Two-phase dependency resolution:
+  - Phase 1 (elsewhere): Encounters are instantiated and registered in ENCOUNTER_MAP with only string-based dependencies (to avoid forward-reference/circular import issues).
+  - Phase 2 (here): Iterate ENCOUNTER_MAP and, for each encounter:
+    - For every dep_name in dependency_names, append ENCOUNTER_MAP[dep_name] to dependencies.
+    - For every antidep_name in anti_dependency_names, append ENCOUNTER_MAP[antidep_name] to anti_dependencies.
+  - Complexity: O(N + E), where N is number of encounters and E is total number of dependency edges.
+- Derived-state update: Immediately invoke update_possibilities() after linking to compute any availability/constraint-driven state.
+
+4) Notable dependencies or patterns
+- Registry pattern: Global ENCOUNTER_MAP serves as a central source of truth for all encounters and enables cross-linking by name.
+- Import side effects / plugin discovery:
+  - from . import base, deck, simple ensures those modules import and (likely) register encounters into ENCOUNTER_MAP as a side effect (notably simple).
+- Two-phase construction to handle forward references and avoid circular dependencies.
+- Import-order sensitivity:
+  - deck is imported before dependencies are resolved, but Deck is only re-exported after resolution. If deck executes logic at import time that assumes resolved dependencies, this could be fragile.
+- Global mutable state:
+  - dependencies and anti_dependencies are mutated at import time; this is not thread-safe during module import and assumes a single initialization pass.
+  - No guard against missing keys; bad names in dependency_names/anti_dependency_names will raise KeyError during import.
+  - No deduplication in dependency lists.
+- Commenting style:
+  - Uses a triple-quoted string as a comment explaining the two-phase initialization approach.
+  - The trailing "ERROR READING FILE..." lines appear to be an artifact; if present in the file, they would cause a syntax error.
+
+=== botc/encounters/simple.py ===
+1) Purpose of the file
+- Defines a small set of simple/testing Encounter implementations used to validate the encounter framework: registration into a central map, dependency and anti-dependency gating, and an example that returns flavor text.
+
+2) Key classes/functions
+- register_encounter (decorator, imported): Class decorator that registers an Encounter with an enum key and its dependency/anti-dependency metadata, likely into ENCOUNTER_MAP at import time.
+- Encounter (base class, imported): Abstract base for all encounters; provides core interface/fields (name, dependency_names, anti_dependency_names) and an async resolve coroutine to be implemented.
+- NullEncounter: No dependencies or anti-dependencies; async resolve is a no-op (testing baseline).
+- NullEncounterChild: Depends on NULL_EVENT_ENUM; only eligible/resolvable after NullEncounter (tests positive dependency).
+- NullEncounterAntiChild: Anti-depends on NULL_EVENT_ENUM; ineligible if NullEncounter has occurred (tests negative dependency).
+- OneShotEncounter: Anti-depends on itself (ONESHOT_EVENT_ENUM), modeling a one-time event that should not fire again once it has occurred.
+- FlavorTextEncounter: No deps; overrides __init__ to set a flavor_text field; resolve should return that text (demonstrates an encounter producing user-facing output).
+
+3) Important logic or algorithms
+- Declarative registration via decorator: Each class is registered with an enum key and lists of dependency and anti-dependency enums. This enables the engine to compute eligibility (e.g., an encounter is allowed if all dependencies are satisfied and no anti-dependencies are present).
+- Gating patterns:
+  - Positive dependency: Child requires parent event completion (NullEncounterChild -> NullEncounter).
+  - Negative dependency (exclusion): Anti-child is blocked if parent occurred (NullEncounterAntiChild vs NullEncounter).
+  - One-shot enforcement: Using self in anti-dependencies prevents re-trigger (OneShotEncounter).
+- Async resolution: resolve methods are coroutines, suggesting integration with an async event loop and possible I/O or scheduling in real engine usage.
+- Current issue: FlavorTextEncounter’s resolve line contains extraneous error text appended to the return statement, which would cause a SyntaxError. It should be: return self.flavor_text.
+
+4) Notable dependencies or patterns
+- Imports: from .base (Encounter, register_encounter, ENCOUNTER_MAP) and from .enums import * (NULL_EVENT_ENUM, NULL_EVENT_CHILD_ENUM, NULL_EVENT_ANTI_CHILD_ENUM, ONESHOT_EVENT_ENUM, FLAVOR_TEXT_EVENT_ENUM).
+- Registry pattern: Central ENCOUNTER_MAP (populated by the decorator) enables discovery/lookup of encounters by enum identifier.
+- Enum-driven configuration: Encounters are keyed and constrained via enum constants, keeping the system consistent and declarative.
+- Star import from enums: Convenient but can obscure the symbol origins; consider explicit imports for clarity.
+- Minor typos: “ecnounter” in flavor text; and the file appears partially corrupted with appended error text.
+
+=== botc/core/distribution.py ===
+1) Purpose of the file
+- Provides role count distribution for a Blood on the Clocktower game given a list of player names. It computes how many Demons, Outsiders, Townsfolk, and Minions are needed based on player count.
+
+2) Key classes/functions
+- RoleDistributor
+  - DISTRIBUTION_TABLE: Class-level mapping from player count (5–15) to a 4-tuple of counts in the order (demons, outsiders, townsfolk, minions).
+  - __init__(player_names: List[str]): Stores the player list and eagerly computes role counts, exposing them as attributes: num_demons, num_outsiders, num_townsfolk, num_minions.
+  - _calculate_role_counts(): Determines the number of players (capped at 15) and returns the corresponding tuple from the table.
+
+3) Important logic or algorithms
+- Table-driven distribution: For each supported player count (5 through 15), the distribution tuple specifies counts that sum to the number of players. The demon count is always 1 in this table; minions/outsiders/townsfolk vary per standard BOTC distributions.
+- Capping at 15: Uses min(len(player_names), 15). For >15 players, it uses the 15-player distribution (may or may not be desired).
+- No handling for <5 players: Accessing DISTRIBUTION_TABLE[num_players] with num_players < 5 raises a KeyError. This is an implicit constraint on minimum player count.
+- Tuple ordering is nonstandard compared to some references (commonly listed as townsfolk, outsiders, minions, demon). Here it is (demon, outsider, townsfolk, minion), which affects how callers must unpack/use results.
+
+4) Notable dependencies or patterns
+- Dependencies: Only typing.List from the standard library; no external packages.
+- Patterns:
+  - Simple, constant-time lookup via a class-level mapping.
+  - Eager computation in __init__, storing results as instance attributes for convenient access.
+  - No validation, error messaging, or role assignment logic—this class only computes counts.
+- Code quality note: The trailing text “ERROR READING FILE: 'str' object has no attribute 'read_text'...” appears to be accidental/non-Python content in the source and would cause a syntax error if present; it should be removed.
+
+=== botc/core/__init__.py ===
+1) Purpose of the file
+- Acts as the package initializer and public API surface for botc.core by re-exporting key classes. It enables consumers to import GameManager and RoleDistributor directly from botc.core without reaching into submodules.
+
+2) Key classes/functions (with brief descriptions)
+- GameManager (re-exported from .game): The main game coordination/management class (implementation lives in botc/core/game.py).
+- RoleDistributor (re-exported from .distribution): The role distribution/assignment component (implementation lives in botc/core/distribution.py).
+- Note: No classes or functions are defined in this __init__.py itself; it only re-exports.
+
+3) Important logic or algorithms
+- None in this file. It solely performs relative imports to expose selected symbols at the package level.
+- Caution: The trailing lines “ERROR READING FILE: 'str' object has no attribute 'read_text'...” are not valid Python and would cause a SyntaxError if present in the actual file. They appear to be artifact text from a failed file-read operation and should be removed from the source.
+
+4) Notable dependencies or patterns
+- Pattern: Facade/public-API aggregation via re-exports in __init__.py, enabling from botc.core import GameManager, RoleDistributor.
+- Dependency: Relies on sibling modules botc.core.game and botc.core.distribution being importable at package import time (this can increase import cost if those modules are heavy or have side effects).
+- No __all__ is defined; however, the imported names become attributes of the package and are thus exported implicitly.
+
+=== botc/core/game.py ===
+1) Purpose of the file
+- Orchestrates a Blood on the Clocktower-style game loop integrated with Discord. It manages player setup and role assignment, night/day cycles, vote-driven executions via polls, role action wake order, neighbor queries, and status effects. It also bridges core game logic with Discord managers/cogs for DMs and interactions.
+
+2) Key classes/functions
+- GameManager
+  - __init__(player_names): Sets up players, role distribution, event deck, Discord bot/cogs, vote table, and game state counters/flags. Loads DISCORD_TOKEN from env.
+  - assign_roles(): Core role assignment:
+    - Samples demons/minions/outsiders/townsfolk from RoleName pools based on RoleDistributor counts.
+    - Applies Baron offset (+2 Outsiders, −2 Townsfolk).
+    - Implements Drunk “believed” fake Townsfolk role and Spy “registered” fake Good role logic.
+    - Shuffles roles and constructs Player objects with believed_role, registered_role, and registered_alignment.
+  - start_game(interaction): Runs first-night actions (per wake order), then loops “day execution poll -> night actions,” sending role DMs and advancing counters; resets temporary status each cycle.
+  - start_voting_phase(interaction): Launches an execution poll via PollManager for currently “alive” voters; handles errors and ephemeral responses.
+  - message_roles_to_players(): DMs each player their visible role info via GameCommands.
+  - resolve_temporary_conditions(): Clears per-cycle status flags (protected/poisoned) for all players.
+  - get_wake_order(is_first_night): Returns players sorted by role_behavior priority (first-night vs other nights); used to sequence actions.
+  - get_alive_neighbors(target_player): Returns the nearest living left/right neighbors in circular seating.
+  - get_player_by_role(target_role): Finds a player whose registered_role matches a RoleName.
+  - get_player_by_name(player_name=""): Looks up a player by name (prompts if blank); raises if not found.
+  - get_board_str(): Produces a human-readable board snapshot including seat index, alive/dead, poison/protect flags, and special notes for Drunk/Spy registrations.
+  - modify_information(message, choices, max_input): Proxy to run a GM-directed DM poll via GameCommands.
+  - reset_vote_table(): Initializes voter->candidate zeroed matrix keyed by player_names.
+
+3) Important logic or algorithms
+- Role distribution
+  - Uses RoleDistributor-provided counts; adjusts counts for Baron (+2 Outsiders/−2 Townsfolk).
+  - Random sampling by role class; final role list is shuffled before assigning to players.
+  - Drunk handling: assigns a fake Townsfolk believed_role (distinct from true role).
+  - Spy handling: assigns a fake Good registered_role so abilities “see” a Good role instead of Spy.
+- Registration vs belief vs alignment
+  - believed_role: what the player thinks they are (Drunk deception).
+  - registered_role/registered_alignment: how they register to others’ abilities (Spy deception).
+- Wake order computation
+  - Sorts by role_behavior.first_night_priority or other_night_priority to define action order.
+- Neighbor traversal
+  - Circular scan skipping dead players to find immediate living neighbors.
+- Discord-driven execution
+  - Daytime execution vote via PollManager.run_execution_poll with allowed voters derived from “alive” list.
+- Status reset
+  - Temporary conditions (protected/poisoned) are cleared each cycle before the execution phase.
+
+4) Notable dependencies or patterns
+- Discord integration
+  - discord.py Interaction API; GameCommands for DMs and in-channel ops; PollManager for execution polls; BotManager for bot lifecycle.
+  - Environment configuration via python-dotenv (DISCORD_TOKEN).
+- Domain model
+  - Enums for RoleName/RoleClass/Alignment; RoleName.get_by_class to define role pools.
+  - Player encapsulates status (alive/poisoned/protected), role_behavior (with priorities), and async take_action.
+- Asynchronous flow
+  - Core game operations that interact with Discord are async (DMs, polls, game start loop).
+- Extensibility hooks
+  - event_deck (Deck.from_json) suggests optional encounter system (currently commented out).
+- Data structures/patterns
+  - Vote matrix as nested dict voter->candidate->count.
+  - Circular list navigation for neighbors.
+- Caveats/edge cases to note
+  - players_alive is set once and not kept in sync with status.alive changes, which can desync allowed voters vs actual living players.
+  - Spy’s registered_alignment is set based on true role class (Evil), not “Good registration,” which contradicts the comment and may leak alignment on the board.
+  - assign_roles may set spy_fake_role to None if no Good roles available; then Spy’s registered_role becomes None, potentially breaking downstream code/formatting.
+  - Default argument player_names=[] is mutable and shared across instances.
+  - Game loop increments night_counter before day actions; ordering of counters and phase naming may not match expected day/night semantics.
+
+=== botc/behaviors/townsfolk.py ===
+1) Purpose of the file
+- Implements behavior logic for Townsfolk (and a few related) roles in a Blood on the Clocktower (BotC) engine.
+- Provides role-specific night actions and information delivery via an Info/Action/Custom role behavior framework.
+- Integrates with the game manager and Discord command cog to prompt players/GM and send results.
+- Registers role behaviors to RoleName via a decorator and assigns night-order priorities.
+
+2) Key classes/functions (with brief descriptions)
+- get_filtered_players(game, role_names_registered=None, role_names_believed=None, alignment=None, is_poisoned=None, is_drunk=None, is_alive=None, is_protected=None, excluded_players=None) -> List[Player]
+  - Utility to filter players by registered alignment, statuses (poisoned/drunk/alive/protected), role sets, and exclusions.
+
+Info roles (InfoRoleBehavior; use a “trusted vs dishonest” data pipeline + optional GM overrides):
+- WasherwomanBehavior (first_night_priority=3)
+  - Trusted: picks one actual Townsfolk and one decoy; returns names and the true role of the Townsfolk.
+  - Dishonest: two random players and a random Townsfolk role.
+  - Manual: GM can override true/fake players/role.
+  - Sends: “One of X and Y is the ROLE.”
+- LibrarianBehavior (first_night_priority=4)
+  - Trusted: like Washerwoman but for Outsiders. Special case: if zero Outsiders, sends “There are no Outsiders in play.”
+  - Dishonest: two random players and a random Outsider role.
+  - Manual: currently no override (returns defaults).
+- ChefBehavior (first_night_priority=6)
+  - Trusted: counts adjacent pairs of EVIL-aligned players around the circular seating.
+  - Dishonest: returns a random count from 0 to min(num_evil, 2); GM can force 0–3.
+  - Sends: “There are N pairs of evil players.”
+- UndertakerBehavior (other_night_priority=7)
+  - Trusted: reveals the executed player’s role (if someone was executed).
+  - Dishonest: random role not equal to the executed player’s role; GM can force a fake role.
+  - Sends: “The player executed today was the ROLE.”
+
+Action role (ActionRoleBehavior; target pipeline: player target, optional GM override, then execute):
+- MonkBehavior (other_night_priority=2)
+  - Prompts Monk to select an alive non-self target; GM can force a target.
+  - Action: sets target.status.protected = True.
+
+Custom/Hybrid roles (RoleBehavior; bypass pipelines with bespoke act()):
+- FortuneTellerBehavior (first_night_priority=8, other_night_priority=9)
+  - Prompts for two alive, non-self targets.
+  - If reliable: YES if either target is a Demon or flagged red_herring; else random YES/NO.
+  - Sends: “Demon presence: YES/NO”.
+- RavenkeeperBehavior (other_night_priority=6)
+  - If killed tonight, may pick a player to view their role.
+  - If reliable: shows true role; else shows a random incorrect role.
+
+Passive/Day roles (PassiveBehavior; no night action here, triggered elsewhere):
+- VirginBehavior, SlayerBehavior, SoldierBehavior, MayorBehavior.
+
+3) Important logic or algorithms
+- Chef adjacency counting:
+  - Iterates players in seating order; increments count for each index i where player i and (i+1) mod n are both EVIL.
+  - Correctly counts contiguous EVIL runs as (run_length - 1) pairs and wraps around.
+- Fortune Teller logic:
+  - Positive ping if either target is a Demon or marked red_herring (simulating false-positive townsfolk).
+  - Unreliable status yields a random YES/NO.
+- Undertaker/Librarian/Washerwoman information pipeline:
+  - Structured split between “trusted” (truthful) and “dishonest” (fake) data builders, with optional GM overrides, then a role-specific result message.
+- Monk protection:
+  - Applies a simple status flag (protected) to be respected by kill-resolution elsewhere.
+- Filtering helper:
+  - Centralized predicate-based player selection across multiple attributes/role-class groupings.
+
+4) Notable dependencies or patterns
+- Decorator-based registration: @register_role(RoleName.X) binds behavior classes to roles.
+- Night-order scheduling via first_night_priority and other_night_priority to integrate with the engine’s phase runner.
+- Asynchronous Discord I/O:
+  - Uses game.command_cog.dmdropdown for player/GM choices and send_direct_message for results.
+  - Uses game.modify_information for GM overrides in info roles.
+- Engine and model dependencies:
+  - GameManager: players list, get_player_by_name, executed_player, killed_tonight, game_master, command_cog.
+  - Player: player_name, registered_role, registered_alignment, status flags (alive, poisoned, drunk, protected, red_herring, is_reliable).
+  - Enums: RoleName, RoleClass.get_by_class to get role-class subsets; Alignment (e.g., EVIL).
+- Data conventions:
+  - Info roles return small dict payloads (e.g., {"players": [...], "role": "..."} or {"pairs": int}) interpreted by send_result.
+  - Roles converted to strings for display.
+- Observations/edge cases:
+  - get_filtered_players uses set subtraction for exclusions, which discards ordering.
+  - role_names_believed filter currently checks registered_role (likely intended to check a “believed/claimed” role attribute).
+  - Fortune Teller UI allows selecting the same target twice (no dedup enforced).
+
+=== botc/behaviors/base.py ===
+1) Purpose of the file
+- Defines the abstract, asynchronous behavior framework for all roles in a Blood on the Clocktower-style game.
+- Provides archetypes (Info, Action, Passive) that implement the high-level “act” flow, including GM (Storyteller) override hooks and reliability (drunk/poisoned) handling.
+- Establishes scheduling hooks via first_night_priority and other_night_priority for turn order.
+
+2) Key classes/functions
+- RoleBehavior (ABC)
+  - first_night_priority, other_night_priority: Optional ints used by the night scheduler to order actions.
+  - is_reliable: Base flag; actual reliability is determined dynamically from player.status.is_reliable.
+  - async check_gm_override(game, player) -> bool: Prompts the Game Master via a DM dropdown to choose manual override. Returns True if the GM chooses to intervene (i.e., selects “No” to skipping manual entry). If no GM configured, returns False.
+  - async act(...): Abstract; implemented by archetypes or concrete roles.
+- InfoRoleBehavior (RoleBehavior)
+  - async act(...): Template that:
+    - Checks player.status.is_reliable to choose “trusted” vs “dishonest” paths.
+    - Optionally allows GM manual override to adjust/replace default results.
+    - Sends results if any night_data is produced.
+  - Abstract hooks to implement per-role specifics:
+    - get_default_trusted(player, game) -> Dict[str, Any]
+    - get_manual_trusted(player, game, default_data) -> Dict[str, Any]
+    - get_default_dishonest(player, game) -> Dict[str, Any]
+    - get_manual_dishonest(player, game, default_data) -> Dict[str, Any]
+    - send_result(player, game, night_data) -> None
+- ActionRoleBehavior (RoleBehavior)
+  - async act(...): Template that:
+    - Optionally allows GM manual override to pick a target.
+    - Otherwise picks a default target.
+    - Executes the action if a target is chosen.
+  - Abstract hooks:
+    - get_default_target(player, game) -> Optional[Player]
+    - get_manual_target(player, game) -> Optional[Player]
+    - execute_action(player, target, game) -> None
+- PassiveBehavior (RoleBehavior)
+  - async act(...): No-op for roles that do nothing at night.
+
+3) Important logic or algorithms
+- Asynchronous Template Method pattern in act():
+  - Fixed orchestration flow; delegates role-specific decisions to abstract methods.
+- GM override workflow:
+  - check_gm_override builds a context-rich prompt (including role name, player name, and reliability status).
+  - Uses a DM dropdown; returns True when GM chooses to intervene (“No” to skipping), False otherwise.
+- Reliability handling (Info roles):
+  - Trusted (sober) vs dishonest (drunk/poisoned) info paths with corresponding default and manual methods.
+  - Manual methods receive default_data to allow adjustment/override.
+- Conditional dispatch:
+  - Only send results if night_data is non-empty.
+  - Only execute actions if a valid target is returned.
+- Scheduling hooks:
+  - first_night_priority and other_night_priority allow the game engine to order night actions.
+
+4) Notable dependencies or patterns
+- Dependencies (expected interfaces):
+  - GameManager: game_master (str), command_cog.dmdropdown(...).
+  - Player: registered_role (str-able), player_name (str), status.is_reliable (bool).
+  - botc.enums.RoleName and local register_role are imported but not used in this file (likely used by concrete role modules for registration).
+- Patterns/architecture:
+  - Template Method (act flow with overridable steps).
+  - Strategy-like specialization via abstract hooks for each role.
+  - Async I/O for UI interaction (Discord-style DM dropdown).
+  - TYPE_CHECKING imports to avoid runtime circular dependencies.
+
+=== botc/behaviors/demons.py ===
+1) Purpose of the file
+- Defines the night-action behavior for the Imp demon role in a Blood on the Clocktower (BotC) game bot. It registers the Imp behavior with the role system and implements how the Imp selects and kills a target at night, accounting for protection.
+
+2) Key classes/functions
+- ImpBehavior(RoleBehavior)
+  - other_night_priority = 5: Schedules this role’s night action order relative to others on “other nights.”
+  - async def act(self, player: Player, game: GameManager) -> None:
+    - Prompts the Imp (via Discord DM dropdown) to choose one living target (excluding themselves).
+    - Resolves the kill: if target is not protected, marks them dead and records the kill; otherwise logs that the Monk protected them.
+    - Prints a status message to indicate the Imp goes back to sleep.
+- @register_role(RoleName.IMP): Decorator that registers ImpBehavior as the implementation for the IMP role in the role registry.
+
+3) Important logic or algorithms
+- Target selection:
+  - Builds a target list from game.players filtering to alive players and excluding the acting player.
+  - Uses game.command_cog.dmdropdown(prompt, options, max_selections=1) to capture a single choice; gracefully no-ops if no selection is made.
+- Kill resolution:
+  - Looks up the chosen player by name via game.get_player_by_name.
+  - If target exists and target.status.is_protected is False:
+    - Sets target.status.alive = False.
+    - Sets game.killed_tonight = target to record the night’s kill for downstream processing/announcements.
+  - If protected, logs a survival message (referencing Monk protection).
+- Night flow control:
+  - other_night_priority indicates when this action executes in the night sequence relative to other roles.
+  - Ends with a “put to sleep” print reflecting typical BotC night narration.
+
+4) Notable dependencies or patterns
+- Role registry pattern: Uses a decorator (@register_role) to bind RoleName.IMP to this behavior, supporting a pluggable/extendable role system.
+- Asynchronous design: act is an async coroutine compatible with event-driven Discord bot flows.
+- Discord integration: Relies on game.command_cog.dmdropdown to present a UI for selections in DMs.
+- Type hinting/forward references:
+  - from __future__ import annotations and TYPE_CHECKING gates for Player and GameManager to avoid import cycles at runtime.
+- Game/Player model assumptions:
+  - Player has player_name, status.alive, status.is_protected, and believed_role.
+  - GameManager provides players, get_player_by_name, command_cog, and killed_tonight.
+
+=== botc/behaviors/minions.py ===
+1) Purpose of the file
+- Defines behavior implementations for Blood on the Clocktower minion roles (Poisoner, Spy, Scarlet Woman). Each behavior encapsulates the role’s night action, ordering (priority), and interactions with the game engine (GameManager, Player).
+
+2) Key classes/functions
+- PoisonerBehavior (RoleBehavior)
+  - first_night_priority=1, other_night_priority=1
+  - act: DM-polls the Poisoner to pick 1 alive player; gracefully handles timeout; sets target.status.poisoned = True; sends the current board to the Poisoner.
+- SpyBehavior (RoleBehavior)
+  - first_night_priority=2, other_night_priority=3
+  - act: Sends the current board string to the Spy (presumably the “Grimoire” view).
+- ScarletWomanBehavior (RoleBehavior)
+  - other_night_priority=4
+  - act: If the Imp is dead and there are 5+ players alive, promotes the Scarlet Woman to Imp by updating:
+    - player.registered_role = RoleName.IMP
+    - player.believed_role = RoleName.IMP
+    - player.registered_alignment = Alignment.EVIL
+    - player.role_behavior = BEHAVIOR_MAP[RoleName.IMP]
+  - Includes a note to DM the player about the change, but the DM call is commented out.
+- register_role decorator
+  - Associates each RoleBehavior with its RoleName in a registry (used elsewhere to dispatch actions/initialization).
+- BEHAVIOR_MAP
+  - Registry used to look up and assign the correct behavior when Scarlet Woman becomes the Imp.
+
+3) Important logic or algorithms
+- Night action ordering:
+  - Encoded via first_night_priority and other_night_priority to coordinate across roles.
+- Poisoner targeting flow:
+  - Uses asynchronous DM poll (dmpoll) to collect one selection from alive players.
+  - Robust timeout handling: safely returns without crashing the game loop if no selection is made.
+  - Applies poison by toggling a status flag on the target player (relies on broader game loop to clear/advance poison status in subsequent phases).
+- Scarlet Woman auto-promotion:
+  - Checks Imp’s death and alive player count threshold (>= 5) to trigger transformation.
+  - Mutates multiple player facets (registered/believed role, alignment, behavior) to fully switch the character.
+- Spy information delivery:
+  - Provides a board snapshot (game.get_board_str) as the Spy’s information each night.
+
+4) Notable dependencies or patterns
+- Asynchronous behavior pattern:
+  - act methods are async coroutines integrating with GameManager.command_cog for DM I/O (dmpoll, send_direct_message).
+- Strategy/registry pattern:
+  - Role behaviors registered via @register_role and resolved via BEHAVIOR_MAP; supports dynamic role swaps (e.g., Scarlet Woman -> Imp).
+- Type hinting without import-time coupling:
+  - TYPE_CHECKING gate to avoid runtime circular imports for Player and GameManager.
+- Game/Player model assumptions:
+  - Player has status flags (alive, poisoned) and role fields (registered_role, believed_role, registered_alignment, role_behavior).
+  - GameManager provides player lookup (get_player_by_name, get_player_by_role), player collections (players, players_alive), and board serialization (get_board_str).
+- Notes/caveats:
+  - Poisoner prints “Put {player.believed_role} to sleep.” which is misleading for poisoning.
+  - Scarlet Woman promotion message is built but not sent (commented out).
+  - Poison target list includes all alive players; any self-targeting or exclusions would need to be enforced upstream or here.
+
+=== botc/behaviors/__init__.py ===
+1) Purpose of the file
+- Establishes a global registry mapping role names to behavior instances for a “Blood on the Clocktower” (BoTC) engine.
+- Provides a decorator-based mechanism to auto-register behavior classes to one or more role names upon module import.
+- Eagerly imports submodules (base, demons, minions, outsiders, townsfolk) to trigger registration side effects.
+
+2) Key classes/functions
+- BEHAVIOR_MAP: Global dict mapping role_name (str) -> behavior instance. Central lookup table for role behaviors.
+- register_role(*role_names): Decorator factory.
+  - On class definition, instantiates the class with no arguments.
+  - Registers the same instance under each provided role name in BEHAVIOR_MAP.
+  - Returns the original class unmodified.
+- Module-level imports: from . import base, demons, minions, outsiders, townsfolk
+  - Imported for side effects so that decorated classes in those modules run their decorators and populate BEHAVIOR_MAP.
+
+3) Important logic or algorithms
+- Decorator-driven auto-registration:
+  - The decorator captures one or more role names and, at class definition time, creates a single instance of the behavior class and assigns it to all specified roles in the global registry.
+  - This creates a per-class singleton-like instance shared across multiple roles it’s registered to.
+- Eager discovery by import:
+  - Importing predefined submodules ensures all decorated classes are loaded and registered at package import time.
+  - Registration order matters: if the same role is registered multiple times, the last one imported overwrites earlier entries (“last write wins”).
+- Implicit constraints:
+  - Behavior classes must be instantiable with a zero-argument constructor.
+  - The shared instance implies behaviors should be stateless or manage state externally; otherwise state may leak between roles or uses.
+  - Registry keys are raw strings; correctness depends on consistent naming/casing.
+- Global mutable state:
+  - BEHAVIOR_MAP is a module-level dict populated during import. Typical Python import locking prevents race conditions at import, but there’s no explicit concurrency control for runtime mutations.
+
+4) Notable dependencies or patterns
+- Patterns:
+  - Decorator-based plugin/registry pattern.
+  - Service locator via a global mapping.
+  - Import-for-side-effects to auto-discover and register plugins.
+- Dependencies:
+  - Pure Python standard features (decorators, closures, relative imports). No external libraries.
+- Organization:
+  - Role behavior modules grouped by role type (base, demons, minions, outsiders, townsfolk), implying a convention-based discovery mechanism tied to package structure.
+
+=== botc/behaviors/outsiders.py ===
+1) Purpose of the file
+- Defines the behavior for the Outsider role “Butler” within a Blood on the Clocktower-style game engine. It registers the Butler’s night action and how/when it runs, and sends private instructions to the Butler player.
+
+2) Key classes/functions
+- register_role(RoleName.BUTLER) (decorator): Registers the Butler behavior class in a central role registry keyed by the RoleName enum, enabling discovery/dispatch of the role’s actions.
+- ButlerBehavior(RoleBehavior):
+  - first_night_priority = 9 / other_night_priority = 10: Scheduling hints used by the game’s night-action orchestrator to order this role’s action on the first night and subsequent nights.
+  - async act(self, player: Player, game: GameManager): Core behavior. Randomly selects a “master” from all game players and privately messages the Butler: “Worship your lord, {master_name}”.
+
+3) Important logic or algorithms
+- Role action scheduling via priority fields: The engine likely iterates role behaviors by these numeric priorities, ensuring consistent night order.
+- Random target selection: master = random.sample(game.players, 1)[0] uniformly picks one player from the current player list each time the action runs.
+  - Note: This selection includes the Butler themselves (no exclusion logic), and there is no persistence; the “master” can change across nights/runs unless handled elsewhere.
+- Asynchronous I/O: Uses await game.command_cog.send_direct_message(...) to DM the player, fitting into an async event loop (e.g., discord bot workflow).
+
+4) Notable dependencies or patterns
+- Dependencies:
+  - botc.enums.RoleName: Enum for role identifiers.
+  - .base.RoleBehavior: Base class defining the role behavior interface and priority convention.
+  - GameManager.command_cog.send_direct_message: Messaging mechanism, likely a Discord cog wrapper for DMs.
+  - typing.TYPE_CHECKING with deferred imports of Player and GameManager to avoid runtime import cycles.
+  - from __future__ import annotations: Postpones evaluation of type annotations, reducing import/order constraints.
+  - random.sample: Used for unbiased selection of one player.
+- Patterns:
+  - Plugin/registry pattern via decorator for auto-registration of role behaviors.
+  - Clear separation of first-night vs. other-night priorities, indicating a rule-driven action scheduler.
+  - Async coroutine design for role actions to integrate with an asynchronous game/bot engine.
+
+Note: The trailing “ERROR READING FILE: 'str' object has no attribute 'read_text'” lines appear to be artifacts from a file-loading process and are not part of the module’s logic.
+
+=== botc/discord_manager/cogs/__init__.py ===
+Note: The file’s contents could not be read (error: "'str' object has no attribute 'read_text'"). The summary below is inferred from the file path/name and common Discord.py project patterns for a cogs package initializer.
+
+1) Purpose of the file
+- Acts as the package initializer for botc/discord_manager/cogs, marking it as a Python package.
+- Often centralizes discovery, export, and/or loading of individual cog modules (extensions) so the bot can enable them easily.
+- May define an async setup(bot) that auto-loads all cog submodules, or expose an __all__ list to control what gets imported.
+
+2) Key classes/functions (typical for this location)
+- async def setup(bot): Orchestrates loading of all cog submodules via bot.load_extension for each module under the cogs package (Discord.py v2+ convention).
+- Discovery helpers (if present):
+  - iter_cog_modules()/available_cogs(): Yields or returns module names to load (skipping private files like _*, __init__.py).
+  - load_all_cogs(bot)/reload_all_cogs(bot): Convenience wrappers around bot.load_extension/bot.reload_extension.
+- Exports:
+  - __all__: List of cog submodule names to expose when using from ... import * or to signal which cogs are “official”.
+
+3) Important logic or algorithms
+- Dynamic module discovery:
+  - Uses pkgutil.iter_modules(__path__, prefix=__name__ + ".") or importlib.resources/files to enumerate submodules.
+  - Filters out non-cog modules (e.g., files starting with _, tests, utils).
+- Extension loading flow:
+  - For each discovered module, call bot.load_extension(modname). In Discord.py v2, each cog module typically defines async def setup(bot) to add its Cog instance.
+  - Robust error handling for extension loading (e.g., catching ExtensionNotFound, ExtensionFailed, ExtensionAlreadyLoaded) and logging failures without crashing the whole load.
+- Conditional behavior:
+  - May gate certain cogs by environment, configuration, or runtime flags (e.g., dev-only cogs).
+  - Might implement hot-reload support in development by unloading and reloading modified cogs.
+
+4) Notable dependencies or patterns
+- Discord.py extension system:
+  - discord.ext.commands (Bot, Cog) and bot.load_extension pattern.
+  - async setup(bot) per-cog module (v2+).
+- Python stdlib utilities for dynamic loading:
+  - importlib, pkgutil, importlib.resources, pathlib, inspect.
+  - logging for load diagnostics; contextlib.suppress for clean error handling.
+- Package organization patterns:
+  - __all__ to curate public submodules.
+  - Treating cogs as plugins for modularity and maintainability.
+  - Asynchronous initialization patterns aligned with Discord.py v2.
+
+If you can provide the file contents, I can replace the inferred points above with an exact, file-specific summary.
+
+=== botc/discord_manager/cogs/game_commands.py ===
+1) Purpose of the file
+- Discord cog that provides admin and utility commands to manage a Blood on the Clocktower game via Discord. It handles lobby creation/joining, starting the game (including a GM selection poll), displaying players, setting seating order, and collecting player input via DMs using dropdowns or Discord Polls.
+
+2) Key classes/functions
+- GameCommands (commands.Cog)
+  - __init__(bot, game): Stores BotManager and GameManager for use across commands/utilities.
+  - set_seats(interaction, mentions): Admin slash command. Parses a string of user mentions to set/lock the seating order, validates against current roster, reorders self.game.players and self.game.player_names, and displays the new board.
+  - dmdropdown(user_name, message_text, options, max_selection): Utility. Sends a DM with a custom DropdownView to collect one or multiple selections (<=25 options). Returns the chosen values or None on timeout/failure.
+  - dmpoll(user_name, poll_message, poll_options, max_selection): Utility. Sends a Discord Poll via DM (<=10 options, multi-select when max_selection > 1). Periodically polls the message to detect selections, enforces selection limits, and falls back to dmdropdown when unsupported. Returns chosen options or None on timeout.
+  - send_direct_message(user_name, message): Utility. DMs a user (found by username/global_name) and returns success status.
+  - print_users(ctx): Debug/power-user text command (requires Manage Roles). Prints guild members (id/name/global_name/roles) to console; acknowledges in chat.
+  - open_lobby(interaction): Admin slash command. Resets player_names and posts an embed with a JoinLobbyView for players to join the lobby.
+  - start_game(interaction): Admin slash command. Closes lobby, runs a GM selection poll via PollManager, then calls game.start_game. Contains test scaffolding that appends many fake players/roles.
+  - display_players(interaction): Slash command. Shows the current list of players.
+
+3) Important logic or algorithms
+- Seating order resolution (set_seats):
+  - Extracts user IDs from a mentions string with regex <@!?(\d+)>.
+  - Resolves each ID to a discord.User (cache-first, then fetch).
+  - Validates that mentions match the active game roster, then rebuilds self.game.players in the specified order and updates self.game.player_names.
+- DM selection flows:
+  - Dropdown path (dmdropdown): Uses a custom Discord View with a select component; waits for view completion or timeout; disables the UI on timeout.
+  - Poll path (dmpoll):
+    - Creates a Discord Poll (duration 1h) with multiple=True when max_selection > 1.
+    - Polls the message channel every 2s to detect when the user has voted; for multi-select, waits a few extra seconds to allow additional selections.
+    - Enforces max_selection in code (Discord Polls don’t natively enforce a max > 1 per user); if exceeded, ends poll, informs the user, and restarts the poll.
+    - Falls back to dropdown when options > 10 or when single-select (by design choice).
+- Error handling and UX:
+  - Extensive ephemeral responses for admin checks, roster mismatches, missing users, and timeouts.
+  - Defensive attempts to disable/close interactive components when time expires or when poll ends.
+
+4) Notable dependencies or patterns
+- Discord.py (discord, discord.ext.commands, app_commands):
+  - Mix of slash commands (app_commands) and classic text commands (commands.command).
+  - Use of Interactions, Views (DropdownView, JoinLobbyView), Embeds, and the newer discord.Poll API.
+- Custom project components:
+  - GameManager (game state; expects players, player_names, get_board_str, start_game).
+  - Player, Alignment, RoleName/RoleClass (role and alignment taxonomy).
+  - JoinLobbyView/DropdownView (UI components), PollManager (GM selection workflow).
+- Patterns and caveats:
+  - User lookup by name/global_name from bot cache; may fail if user not cached or if names are ambiguous.
+  - Seating validation uses inconsistent normalization (mix of raw vs lowercased names) and exact player_name equality for reordering, which can cause false mismatches.
+  - start_game contains test code that appends many fake Player entries and uses an incorrect minimum-player check (num_players < 0).
+  - print_users attempts ctx.send(ephemeral=True), which is not supported for classic text commands (ephemeral is for interactions).
+  - Redundant/duplicated imports (Player, Alignment, RoleName) indicate cleanup is needed.
+
