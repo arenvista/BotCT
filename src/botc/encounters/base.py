@@ -37,7 +37,7 @@ class Encounter(ABC):
         
     
     @abstractmethod
-    async def resolve(self,*args,**kwargs)->None: #async because we might want to use polling and shit
+    async def resolve(self,game,interaction)->None: #async because we might want to use polling and shit
         pass
     
     def __str__(self):
