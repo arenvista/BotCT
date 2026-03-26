@@ -187,6 +187,9 @@ class GameManager:
                 await interaction.channel.send(card.specific_encounter.flavor_text) 
                 card.specific_encounter.resolve(self)
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
