@@ -11,7 +11,6 @@ class EncounterCard: #multiple encounter cards can correspond to the same encoun
         self.specific_encounter=specific_encounter
         
 class Deck: #each game will have one instance of the deck class
-    
     @classmethod
     def from_json(cls,json_file_name):
         if not json_file_name.endswith(".json"):
@@ -25,19 +24,12 @@ class Deck: #each game will have one instance of the deck class
             [c for c in count_list]
         )
             
-        
     def __init__(self,encounter_list: List[Encounter],count_list:List[int]):
-        
-
         self.unresolved_encounter_card_list:List[EncounterCard]=[]
         self.resolved_encounter_card_list:List[EncounterCard]=[]
-
         for encounter,count in zip(encounter_list,count_list):
             self.unresolved_encounter_card_list.extend([EncounterCard(encounter) for _ in range(count)])
         update_possibilities()
-    
-    
-            
     
     def draw_card(self)-> EncounterCard:
         indices=[c for c,card in enumerate(self.unresolved_encounter_card_list) if (card.specific_encounter.parents_resolved and (card.specific_encounter.impossible==False))]
@@ -69,13 +61,11 @@ class Deck: #each game will have one instance of the deck class
         return len(self.unresolved_encounter_card_list)+len(self.resolved_encounter_card_list)
     
     def __bool__(self):
-        
         if len(self.unresolved_encounter_card_list)==0:
             return False
         
         for card in self.unresolved_encounter_card_list:
             if card.specific_encounter:
                 return True
-            
 
         return False

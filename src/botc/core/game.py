@@ -78,7 +78,6 @@ class GameManager:
 
         chosen_outsiders = random.sample(self.ROLES_OUTSIDERS, outsider_count)
         chosen_townsfolk = random.sample(self.ROLES_TOWNSFOLK, townsfolk_count)
-
         selected_roles = chosen_demons + chosen_outsiders + chosen_townsfolk + chosen_minions
 
         drunk_fake_role = None
@@ -115,9 +114,11 @@ class GameManager:
             player.poisoned=False
 
     async def start_game(self, interaction: discord.Interaction):
-        # self.roles_distribution = RoleDistributor(self.player_names)
-        # self.players = self.assign_roles()
-        self.players.append(Player("@iiiii5184",RoleName.WASHERWOMAN, RoleName.WASHERWOMAN, RoleName.WASHERWOMAN, Alignment.GOOD))
+        # self.players.append(Player("@iiiii5184",RoleName.WASHERWOMAN, RoleName.WASHERWOMAN, RoleName.WASHERWOMAN, Alignment.GOOD))
+        # self.players.append(Player("@microsina",RoleName.WASHERWOMAN, RoleName.WASHERWOMAN, RoleName.WASHERWOMAN, Alignment.GOOD))
+        self.roles_distribution = RoleDistributor(self.player_names)
+        self.players = self.assign_roles()
+
         self.players_alive = self.players
 
         await self.message_roles_to_players()
@@ -131,11 +132,10 @@ class GameManager:
             await self.start_voting_phase(interaction)
             self.day_counter+=1
             
-            if self.event_deck:
-                card=self.event_deck.draw_card()
-                await interaction.channel.send(card.specific_encounter.flavor_text) 
-                card.specific_encounter.resolve(self)
-                
+            # if self.event_deck:
+            #     card=self.event_deck.draw_card()
+            #     await interaction.channel.send(card.specific_encounter.flavor_text) 
+            #     card.specific_encounter.resolve(self)
             
             for player in self.get_wake_order(is_first_night=False):
                 await player.take_action(self)
@@ -179,7 +179,7 @@ class GameManager:
 
     def get_player_by_role(self, target_role: RoleName) -> Optional[Player]:
         for p in self.players:
-            if p.actual_role == target_role: return p
+            if p.registered_role == target_role: return p
         return None
 
     def get_player_by_name(self, player_name="") -> Player:
@@ -206,12 +206,12 @@ class GameManager:
             poison_str = " [POISONED]" if player.poisoned else ""
             protect_str = " [PROTECTED]" if player.protected else ""
 
-            if player.actual_role == RoleName.DRUNK:
+            if player.registered_role == RoleName.DRUNK:
                 role_info = f"Drunk (Thinks: {player.believed_role})"
-            elif player.actual_role == RoleName.SPY:
+            elif player.registered_role == RoleName.SPY:
                 role_info = f"Spy (Registers: {player.registered_role}/{player.registered_alignment})"
             else:
-                role_info = f"{player.actual_role} ({player.registered_alignment})"
+                role_info = f"{player.registered_role} ({player.registered_alignment})"
 
             output_str += f"Seat {i+1:02d} | {player.player_name:<8} | {status:<5} | {role_info}{poison_str}{protect_str}\n"
         output_str += "="*55 + "\n```"

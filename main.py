@@ -4,15 +4,13 @@ from pathlib import Path
 import argparse
 import os
 
-# Tell Python to look in the 'src' directory for modules
 sys.path.append(str(Path(__file__).parent / "src"))
 
 from botc.core import GameManager
 from time import sleep
 
 def main():
-    example = ["Alice", "Bob", "Charlie", "David", "Eve", "Frank", "Grace", "Henry"]
-    game = GameManager(example)
+    game = GameManager([])
     game.bot.run(game.token)
     print("done")
     while input() != "z":

@@ -2,10 +2,16 @@
 from enum import Enum
 from typing import List
 
+class Status(Enum):
+    POISIONED = 1
+    DRUNK = 2
+    PROTECTED = 3
+    def __str__(self):
+        return self.name.title()
+
 class Alignment(Enum):
     GOOD = 1
     EVIL = 2
-
     def __str__(self):
         return self.name.title()
 

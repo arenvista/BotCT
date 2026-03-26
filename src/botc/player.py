@@ -10,11 +10,12 @@ if TYPE_CHECKING:
     from botc.behaviors.base import RoleBehavior
 
 class Player: 
-    def __init__(self, player_name: str, actual_role: RoleName, believed_role: RoleName | None = None, registered_role: RoleName | None = None, registered_alignment: Alignment | None = None):
+    def __init__(self, player_name: str, believed_role: RoleName, registered_role: RoleName, registered_alignment: Alignment):
         self.player_name: str = player_name
-        self.actual_role: RoleName = actual_role
-        self.believed_role: RoleName = believed_role if believed_role else actual_role
-        self.registered_role: RoleName = registered_role if registered_role else actual_role
+
+        self.believed_role: RoleName = believed_role
+        self.registered_role: RoleName = registered_role
+
         self.registered_alignment: Alignment = registered_alignment if registered_alignment else self._default_alignment()
         self.alive: bool = True
         self.poisoned: bool = False
@@ -26,7 +27,7 @@ class Player:
         return output
 
     def _default_alignment(self) -> Alignment:
-        if self.actual_role.role_class in (RoleClass.DEMONS, RoleClass.MINIONS):
+        if self.registered_role.role_class in (RoleClass.DEMONS, RoleClass.MINIONS):
             return Alignment.EVIL
         return Alignment.GOOD
 
@@ -37,7 +38,7 @@ class Player:
 
     def _to_dict(self) -> dict:
         return {
-            "actual_role": self.actual_role.name, 
+            "registered_role": self.registered_role.name, 
             "believed_role": self.believed_role.name,
             "registered_role": self.registered_role.name,
             "registered_alignment": self.registered_alignment.name,

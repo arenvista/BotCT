@@ -13,13 +13,4 @@ class RoleDistributor:
 
     def _calculate_role_counts(self):
         num_players = min(len(self.player_names), 15)
-        
-        # Auto-fill for testing if under 5 players
-        # if num_players < 5: 
-        #     for i in range(len(self.player_names) + 1, 6):
-        #         self.player_names.append(f"Player {i}")
-        #     num_players = 5
-            
-        if num_players == 1:
-            num_players = 5
         return self.DISTRIBUTION_TABLE[num_players]

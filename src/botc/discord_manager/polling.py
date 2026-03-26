@@ -82,7 +82,6 @@ class PollManager:
                 user_clean = user.name.lower()
                 global_clean = user.global_name.lower() if user.global_name else ""
                 
-                # FIXED: Checking usernames instead of IDs
                 if user_clean in clean_allowed_names or global_clean in clean_allowed_names:
                     candidates.append(user)
 
@@ -102,7 +101,6 @@ class PollManager:
             except ValueError:
                 pass # Player not found in list, which is fine
                 
-            # 2. FIXED: Remove them from the raw name list so they don't get dealt a role!
             for name in allowed_player_names:
                 clean_n = name.lstrip('@').lower()
                 if clean_n == selected_gm.name.lower() or (selected_gm.global_name and clean_n == selected_gm.global_name.lower()):
@@ -202,4 +200,3 @@ class PollManager:
 
         print(self.game.get_board_str())
         return poll_message
-
