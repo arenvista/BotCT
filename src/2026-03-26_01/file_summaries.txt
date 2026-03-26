@@ -1,0 +1,539 @@
+=== api.py ===
+The `api.py` script automates summarizing a Python codebase using the OpenAI GPT model.
+
+**Purpose:**  
+To generate concise summaries of individual Python files and then produce a high-level overview of the entire codebase.
+
+**Key Functions:**  
+- `get_python_files(root=".")`: Recursively finds all `.py` files from the root directory.  
+- `read_file(path)`: Reads and truncates file content to a max character limit (20,000 chars).  
+- `call_llm(prompt, content)`: Sends prompts and content to the OpenAI GPT model (`gpt-4.1-mini`) and returns the generated text.  
+- `summarize_files(files)`: Iterates over Python files, reads their content, and generates summaries using the LLM with a focused prompt.  
+- `summarize_all(summaries)`: Combines all file summaries and prompts the LLM to produce a comprehensive overview of the codebase.  
+- `main()`: Orchestrates the process — finds files, summarizes them, creates the final overview, and saves results to text files.
+
+**Important Logic:**  
+- Uses a map-reduce style approach: map step generates per-file summaries; reduce step synthesizes these into a global summary.  
+- Limits file reading size to avoid overly large inputs.  
+- Employs structured prompts to guide the LLM for consistent and informative summaries.  
+- Outputs are saved into `file_summaries.txt` (individual file summaries) and `final_summary.txt` (overall codebase summary).
+
+Overall, the script leverages GPT to assist in understanding and documenting Python projects by summarizing code files and their collective architecture.
+
+=== botc/enums.py ===
+This Python file defines enums and a status dataclass for a game, likely "Blood on the Clocktower" or a similar social deduction game.
+
+**Purpose:**
+- To represent player statuses, alignments, role classes, and specific role names with associated metadata and helper methods.
+
+**Key components:**
+
+1. **Status (dataclass):**
+   - Tracks boolean flags for player conditions: poisoned, drunk, protected, alive, red_herring.
+   - Properties:
+     - `is_reliable`: True if not poisoned or drunk.
+     - `is_protected`: True if protected and not poisoned.
+   - Method `toggle(attr_name)`: Dynamically toggles a boolean status attribute by name.
+
+2. **Alignment (Enum):**
+   - Two values: GOOD and EVIL.
+   - String representation returns capitalized name.
+
+3. **RoleClass (Enum):**
+   - Categories of roles: GAMEMASTER, DEMONS, MINIONS, OUTSIDERS, TOWNSFOLK.
+   - Property `display_name` returns a nicely formatted string.
+   - String representation uses `display_name`.
+
+4. **RoleName (Enum):**
+   - Enum members represent specific roles, each linked to a RoleClass.
+   - Custom `__new__` method to attach RoleClass to each role.
+   - Roles cover all role classes, e.g., POISONER (MINIONS), IMP (DEMONS), MAYOR (TOWNSFOLK), GAMEMASTER.
+   - Property `display_name` formats the role name.
+   - Class method `get_by_class` returns all roles belonging to a given RoleClass.
+
+**Important logic:**
+- Status toggling via string attribute names allows flexible state changes.
+- RoleName enum extends standard enum to associate roles with their class, supporting filtering by class.
+- String representations provide user-friendly names for display.
+
+Overall, this module organizes game roles and player statuses with convenient accessors and categorization for game logic use.
+
+=== botc/__init__.py ===
+The `botc/__init__.py` file serves as the core engine package initializer for the "Blood on the Clocktower" game. Its main purpose is to expose key enums (`Alignment`, `RoleClass`, `RoleName`, `Status`) and the `Player` class at the package level, enabling convenient imports directly from `botc`. The file also contains a commented-out `__all__` list intended to control what is imported during wildcard imports, though it is currently incomplete and inactive.
+
+=== botc/player.py ===
+The `player.py` file defines a `Player` class representing a player in the game "Blood on the Clocktower" (botc).
+
+**Purpose:**  
+To encapsulate player-related data and behavior, including roles, alignment, status, and actions during the game.
+
+**Key components:**
+
+- **Attributes:**  
+  - `player_name`: Player's name.  
+  - `believed_role`: The role the player is believed to have (may differ from registered role).  
+  - `registered_role`: The official role assigned to the player.  
+  - `registered_alignment`: Player's alignment (Good or Evil), defaulting based on role class if not provided.  
+  - `status`: Player's current status (alive, poisoned, protected).  
+  - `role_behavior`: Behavior object linked to the player's believed role, dictating actions.  
+  - `vote_token`: Number of votes the player can cast (default 1).
+
+- **Methods:**  
+  - `show_role()`: Returns a string introducing the player and their believed role.  
+  - `_default_alignment()`: Determines default alignment based on role class (Demons/Minions → Evil, else Good).  
+  - `take_action(game)`: Asynchronously executes the player's role behavior if alive or if the role is Ravenkeeper (special case).  
+  - `_to_dict()`: Serializes key player attributes and status into a dictionary for external use.
+
+**Important logic:**  
+- The alignment defaults intelligently based on role class if not explicitly set.  
+- The `take_action` method respects player status, skipping actions if dead except for the Ravenkeeper role.  
+- Role behaviors are dynamically assigned from a behavior map, allowing flexible role-specific logic.
+
+=== botc/discord_manager/polling.py ===
+This Python file defines a `PollManager` class responsible for managing interactive polls within a Discord-based game environment, specifically for selecting a Game Master (GM) and conducting execution votes during the game.
+
+**Purpose:**  
+- Facilitate player polls in Discord text channels to choose a GM and to vote on player executions.
+- Integrate with the game's state management to update player statuses based on poll outcomes.
+
+**Key Functions:**
+
+1. **`run_gamemaster_poll`**  
+   - Creates a poll asking players if they want to be the GM.  
+   - Runs the poll in a dedicated public thread, waits up to 4 minutes or until all allowed players vote.  
+   - Collects "Yes" voters from the allowed list, randomly selects one as GM, updates the game state by removing the GM from player lists, and announces the selection.  
+   - Handles errors such as invalid channel types and HTTP exceptions during polling.
+
+2. **`run_execution_poll`**  
+   - Initiates a voting poll in a public thread for the town to select a player to execute on a given game day.  
+   - Uses a custom `ExecutionView` with a dropdown menu for voting.  
+   - Waits up to 4 minutes or until all allowed players have voted.  
+   - Tallies votes, requires a majority (>50%) to execute a player; otherwise, no execution occurs.  
+   - Updates the executed player's alive status in the game and announces results.  
+   - Handles invalid channels and ensures voting is restricted to allowed players.
+
+**Important Logic:**  
+- Both polls run asynchronously with periodic checks for vote completion or timeout.  
+- Poll results are carefully validated against allowed players to maintain game integrity.  
+- The GM poll uses Discord's native poll feature, while the execution poll uses a custom dropdown view.  
+- Game state updates (player removal, status changes) are synchronized with poll outcomes.  
+- Robust error handling and user feedback ensure smooth user experience in Discord interactions.
+
+=== botc/discord_manager/views.py ===
+This Python file defines Discord UI components (using discord.py) for managing player interactions in a game bot context.
+
+**Purpose:**  
+To provide interactive Discord UI elements for player voting, joining a game lobby, and making selections via dropdown menus within a game managed by a GameManager.
+
+**Key Classes and Logic:**
+
+1. **ExecutionDropdown (discord.ui.Select):**  
+   - Dropdown menu listing alive players plus a "Skip Vote" option for execution voting.  
+   - Records user votes in a dictionary keyed by username.  
+   - Sends ephemeral confirmation messages when a vote is cast.
+
+2. **ExecutionView (discord.ui.View):**  
+   - A container view holding the `ExecutionDropdown` for execution voting.  
+   - No timeout, allowing indefinite interaction.
+
+3. **JoinLobbyView (discord.ui.View):**  
+   - Contains a "Join Game" button.  
+   - On click, adds the user to the game’s player list if not already present.  
+   - Sends ephemeral confirmation or warning messages accordingly.
+
+4. **DropdownView (discord.ui.View):**  
+   - Generic dropdown supporting up to 25 options and configurable max selections.  
+   - On selection, disables the dropdown to lock in the choice, updates the message, and stops the view to signal completion.  
+   - Stores selected values for later retrieval.
+
+**Important Logic:**  
+- Use of ephemeral messages to confirm user actions privately.  
+- Maintaining vote and player state within UI components.  
+- Disabling UI elements after selection to prevent changes.  
+- Integration with a `GameManager` (type hinted but not defined here) to track game state.
+
+=== botc/discord_manager/__init__.py ===
+This Python file serves as the package initializer for the `discord_manager` module within the `botc` project. It imports and exposes three key components:
+
+- **BotManager** (from `.bot`): Likely manages the core Discord bot functionality.
+- **JoinLobbyView** (from `.views`): Presumably a UI component or interaction view related to joining a lobby.
+- **PollManager** (from `.polling`): Handles polling or voting features within the Discord bot.
+
+The file's purpose is to provide a convenient import interface for these main classes, facilitating their use elsewhere in the project.
+
+=== botc/discord_manager/bot.py ===
+This Python file defines a Discord bot manager class for integrating a game management system with Discord.
+
+**Purpose:**  
+To create and manage a Discord bot that connects game logic (via a GameManager) with Discord commands and interactions.
+
+**Key Class:**  
+- `BotManager(commands.Bot)`: Subclasses `commands.Bot` from discord.py, initializing the bot with specific intents and linking it to a `GameManager` instance.
+
+**Important Logic:**  
+- **Initialization:** Sets Discord intents to enable message content and member events, stores a reference to the game manager, and sets the command prefix to "!".  
+- **setup_hook:** Loads environment variables, adds the `GameCommands` cog (which presumably contains the bot's command implementations tied to the game), and syncs the bot's command tree to a test Discord server (using a server ID from environment variables or a fallback hardcoded ID). This enables fast command updates during development/testing.  
+- **on_ready:** Confirms the bot is ready and prints a startup message including the bot's username.
+
+Overall, this file encapsulates the Discord bot setup and command synchronization while linking it to the core game management logic.
+
+=== botc/encounters/enums.py ===
+This Python file defines string constants representing different types of event enums used in the "botc" encounters module. 
+
+Purpose:
+- To provide standardized identifiers for various event categories in the encounter system.
+
+Key elements:
+- NULL_EVENT_ENUM: Represents a null or no-event.
+- NULL_EVENT_CHILD_ENUM: Represents a child event of a null event.
+- NULL_EVENT_ANTI_CHILD_ENUM: Represents an anti-child event related to a null event.
+- ONESHOT_EVENT_ENUM: Represents a one-time or single occurrence event.
+- FLAVOR_TEXT_EVENT_ENUM: Represents an event used for flavor text or narrative description.
+
+No functions or classes are defined; the file solely serves as a container for these event type constants.
+
+=== botc/encounters/base.py ===
+This Python file defines a base framework for managing "encounters" in a system, likely for a game or interactive narrative.
+
+**Purpose:**
+- To provide an abstract base class and registration system for encounters that have dependencies and anti-dependencies affecting their possibility and resolution status.
+
+**Key components:**
+
+1. **ENCOUNTER_MAP (dict):**
+   - Global registry mapping encounter names to their instantiated objects.
+
+2. **register_encounter (decorator):**
+   - Registers an encounter class by instantiating it with its name, dependencies, and anti-dependencies.
+   - Adds the instance to ENCOUNTER_MAP.
+
+3. **Encounter (abstract base class):**
+   - Attributes:
+     - `name`: Encounter identifier.
+     - `dependency_names` & `anti_dependency_names`: Lists of names for dependencies and anti-dependencies.
+     - `dependencies` & `anti_dependencies`: Lists of Encounter objects (resolved later).
+     - `impossible`: True if any anti-dependency has resolved, making this encounter impossible.
+     - `parents_resolved`: True if all dependencies have resolved, making this encounter possible.
+     - `resolved`: True if this encounter has been completed.
+     - `flavor_text` and `image`: Optional descriptive text and image for the encounter.
+   - Abstract async method `resolve`: To be implemented by subclasses to define encounter resolution logic.
+   - Boolean and string representations reflect encounter status.
+
+4. **update_possibilities():**
+   - Iterates over all encounters in ENCOUNTER_MAP.
+   - Updates each encounter's `impossible` flag if any anti-dependency is resolved.
+   - Updates `parents_resolved` flag if all dependencies are resolved.
+
+5. **reset_resolved():**
+   - Resets all encounters' `impossible`, `parents_resolved`, and `resolved` flags to False.
+   - Intended mainly for testing purposes.
+
+**Important logic:**
+- Encounters become impossible if any anti-dependency resolves.
+- Encounters become possible only if all dependencies have resolved.
+- The system uses these flags to control which encounters can occur next.
+- The abstract `resolve` method is asynchronous, anticipating potentially complex or time-dependent resolution logic.
+
+Overall, this module sets up a dependency-driven encounter system with clear rules for possibility and resolution, designed for extensibility via subclassing and registration.
+
+=== botc/encounters/deck.py ===
+This Python file defines classes to manage a deck of encounter cards for a game.
+
+**Purpose:**  
+To represent and manage a deck of encounter cards, where each card corresponds to a specific encounter. The deck supports loading from JSON, drawing cards based on certain conditions, and tracking resolved/unresolved encounters.
+
+**Key Classes and Functions:**
+
+- **EncounterCard:**  
+  Wraps a specific `Encounter` instance. Multiple cards can represent the same encounter to model different rarities intuitively.
+
+- **Deck:**  
+  Represents the deck of encounter cards for a game instance.
+  - `from_json(cls, json_file_name)`: Class method to create a deck from a JSON file specifying encounter names and counts.
+  - `__init__(self, encounter_list, count_list)`: Initializes the deck with unresolved encounter cards based on given encounters and their counts.
+  - `draw_card(self)`: Draws a random unresolved card whose encounter's parents are resolved and that is not impossible, marks it resolved, moves it to resolved list, updates possibilities, and returns it.
+  - `__str__(self)`: Returns a string summary of unresolved and resolved cards with their frequencies.
+  - `__len__(self)`: Returns total number of cards (resolved + unresolved).
+  - `__bool__(self)`: Returns `False` if no unresolved cards remain or no unresolved cards have a valid specific encounter; otherwise `True`.
+
+**Important Logic:**
+
+- Cards are only drawable if their encounter's prerequisites (`parents_resolved`) are met and the encounter is not marked impossible.
+- Drawing a card updates the encounter's resolved status and triggers `update_possibilities()` to refresh game state.
+- The deck maintains separate lists for unresolved and resolved cards to track game progress.
+- Loading from JSON allows flexible deck construction based on external data.
+
+Overall, this module encapsulates encounter card management with dependency-aware drawing and state tracking for a game encounter system.
+
+=== botc/encounters/__init__.py ===
+This Python file initializes the encounters submodule by importing key components (base, deck, simple) and setting up dependencies between encounter events.
+
+**Purpose:**
+- To finalize the setup of encounter event objects by linking their dependencies and anti-dependencies after all events have been instantiated.
+- To ensure that each encounter event's dependency lists contain actual event objects rather than just names.
+
+**Key logic:**
+- Iterates over all encounter events in `ENCOUNTER_MAP`.
+- For each event, replaces dependency and anti-dependency names with references to the actual event objects from `ENCOUNTER_MAP`.
+- Calls `update_possibilities()` to refresh or recalculate encounter possibilities based on these updated relationships.
+- Imports the `Deck` class from the deck module for external use.
+
+**Summary:**
+The file bridges initial event declarations (which only know dependency names) with fully instantiated event objects, enabling proper dependency management within the encounter system.
+
+=== botc/encounters/simple.py ===
+This Python file defines simple encounter event classes for testing purposes within a game or simulation framework.
+
+**Purpose:**
+- To provide basic, mostly no-op encounter implementations for testing the encounter system.
+- To register these encounters with a central encounter registry using decorators.
+
+**Key Classes:**
+- `NullEncounter`, `NullEncounterChild`, `NullEncounterAntiChild`, `OneShotEncounter`: All inherit from `Encounter` and implement an async `resolve` method that does nothing (pass).
+- `FlavorTextEncounter`: Also inherits from `Encounter`, but returns a fixed flavor text string when resolved.
+
+**Important Logic:**
+- Each class is registered as an encounter using the `@register_encounter` decorator, which associates it with specific event enums and dependency/anti-dependency lists.
+- The `FlavorTextEncounter` overrides the constructor to set a static flavor text and its `resolve` method returns this text asynchronously.
+- The other encounters serve as placeholders or stubs, likely to test event triggering and dependency resolution without side effects.
+
+=== botc/core/distribution.py ===
+This Python file defines a `RoleDistributor` class designed to allocate role counts for a game based on the number of players.
+
+- **Purpose:** To determine the distribution of different roles (demons, outsiders, townsfolk, minions) for a player group ranging from 5 to 15 players.
+
+- **Key components:**
+  - `DISTRIBUTION_TABLE`: A class-level dictionary mapping player counts (5 to 15) to tuples representing counts of (demons, outsiders, townsfolk, minions).
+  - `__init__(self, player_names)`: Initializes with a list of player names and calculates role counts.
+  - `_calculate_role_counts(self)`: Uses the number of players (capped at 15) to retrieve the corresponding role distribution from the table.
+
+- **Important logic:** The role counts are determined solely by the number of players, ensuring the game roles are balanced for the given player count.
+
+=== botc/core/__init__.py ===
+This Python file serves as an initializer for the `botc.core` package. It imports and exposes two key components:
+
+- `GameManager` from the `game` module: likely responsible for managing the overall game logic and state.
+- `RoleDistributor` from the `distribution` module: likely handles the distribution or assignment of roles within the game.
+
+The file's purpose is to simplify access to these core classes by aggregating them at the package level.
+
+=== botc/core/game.py ===
+This Python file defines the core game logic for a Discord-based implementation of the social deduction game "Blood on the Clocktower."
+
+**Purpose:**  
+Manage game state, player roles, turn order, voting, and interactions within a Discord bot environment.
+
+**Key Class:**
+- `GameManager`: Central class managing players, roles, game phases (day/night), voting, and Discord bot integration.
+
+**Important Logic and Functions:**
+
+- **Role Assignment (`assign_roles`)**:  
+  Randomly assigns roles to players based on predefined distributions for Demons, Minions, Outsiders, and Townsfolk. Handles special cases like the Baron (affecting Outsider/Townsfolk counts), Drunk (who believes a fake role), and Spy (who registers a fake role and alignment).
+
+- **Game Initialization (`__init__`, `start_game`)**:  
+  Initializes player lists, role distributions, counters, and Discord bot components. `start_game` runs the main game loop, cycling through nights and days, resolving temporary conditions, messaging roles privately, and managing player actions.
+
+- **Voting (`start_voting_phase`, `reset_vote_table`)**:  
+  Manages voting phases via Discord polls, tracking votes in a nested dictionary keyed by voter and candidate.
+
+- **Player Interaction Helpers:**  
+  - `get_alive_neighbors`: Finds alive players adjacent to a target player in seating order.  
+  - `get_player_by_role` / `get_player_by_name`: Lookup utilities.  
+  - `get_wake_order`: Determines the order players wake up to act during night phases based on role priorities.
+
+- **State Management:**  
+  - `resolve_temporary_conditions`: Resets temporary player statuses like protection and poison each night.  
+  - `message_roles_to_players`: Sends private Discord messages informing players of their roles.  
+  - `get_board_str`: Returns a formatted string representing the current game board state, including player status and role info.
+
+- **Discord Integration:**  
+  Uses environment variables for Discord token, and integrates with `BotManager`, `PollManager`, and `GameCommands` to handle bot commands, polling, and direct messaging.
+
+Overall, this file encapsulates the game flow and player management logic necessary to run a "Blood on the Clocktower" game session within a Discord bot framework.
+
+=== botc/behaviors/townsfolk.py ===
+This Python file defines behaviors for various "townsfolk" roles in a game framework (likely for the game "Blood on the Clocktower"). It organizes role logic into categories: info roles, action roles, custom/hybrid roles, and passive/day roles, each implementing specific nighttime or game-phase behaviors.
+
+**Purpose:**  
+To implement the nighttime and special phase behaviors of townsfolk-aligned roles, including how they gather information, choose targets, and interact with the game state.
+
+**Key Functions/Classes:**
+
+- **get_filtered_players:** Utility to filter players by role, alignment, status effects (poisoned, drunk, alive, protected), and exclusions.
+
+- **InfoRoleBehavior subclasses:** Roles that gather or provide information during the night.
+  - *WasherwomanBehavior:* Learns if one of two players is a specific townsfolk role.
+  - *LibrarianBehavior:* Similar to Washerwoman but for Outsiders.
+  - *ChefBehavior:* Counts pairs of adjacent evil players.
+  - *UndertakerBehavior:* Learns the role of the player executed that day.
+
+- **ActionRoleBehavior subclass:**
+  - *MonkBehavior:* Protects a chosen player at night.
+
+- **Custom/Hybrid RoleBehavior subclasses:**
+  - *FortuneTellerBehavior:* Queries two players each night to detect demon presence, with reliability affected by player status.
+  - *RavenkeeperBehavior:* If killed at night, can view another player's role (or a fake role if unreliable).
+
+- **PassiveBehavior subclasses:** Roles that do not act at night but have daytime triggers or effects (Virgin, Slayer, Soldier, Mayor).
+
+**Important Logic:**
+
+- Info roles use a 4-step data pipeline: default trusted info, manual trusted overrides by GM, default dishonest info, manual dishonest overrides, and sending results to players.
+
+- Action roles prompt players or GMs for targets and execute effects (e.g., Monk protects a player).
+
+- Custom roles like Fortune Teller and Ravenkeeper have unique interactive logic involving multiple selections or conditional information reveal.
+
+- Passive roles are placeholders for daytime-triggered behaviors handled elsewhere.
+
+Overall, the file modularizes townsfolk role logic with asynchronous methods for interaction, GM overrides, and game state updates, supporting a flexible and interactive game management system.
+
+=== botc/behaviors/base.py ===
+This Python file defines the foundational behavior classes for role actions in a game framework, likely for a social deduction game like Blood on the Clocktower.
+
+**Purpose:**  
+To provide abstract base classes and archetypes for different role behaviors during the night phase of the game, supporting both automated and manual (Game Master overridden) actions.
+
+**Key Classes and Logic:**
+
+1. **RoleBehavior (abstract base class)**  
+   - Root class for all role behaviors.  
+   - Defines `check_gm_override` method to allow the Game Master (GM) to manually override a player's night action via a prompt.  
+   - Abstract method `act` that all subclasses must implement, representing the role's night action.
+
+2. **InfoRoleBehavior (inherits RoleBehavior)**  
+   - Archetype for roles that receive information from the Storyteller/Game Master (e.g., Investigator, Empath).  
+   - Implements `act` by checking if the player is reliable and whether GM override is requested, then gathers night data accordingly (trusted vs dishonest versions).  
+   - Declares abstract methods for obtaining default and manual info in both trusted and dishonest states, plus sending the result to the player.
+
+3. **ActionRoleBehavior (inherits RoleBehavior)**  
+   - Archetype for roles that perform actions targeting other players but do not receive info back (e.g., Monk, Poisoner).  
+   - Implements `act` by checking for GM override, then getting either a manual or default target and executing the action.  
+   - Declares abstract methods for getting default/manual targets and executing the action.
+
+4. **PassiveBehavior (inherits RoleBehavior)**  
+   - Archetype for roles that do nothing at night (e.g., passive roles or day-acting roles).  
+   - Implements `act` as a no-op.
+
+**Important Logic:**  
+- The GM override system allows dynamic manual intervention in role actions, enhancing flexibility.  
+- Roles are categorized by their interaction type at night: information gathering, action targeting, or passive.  
+- The design uses async methods to support asynchronous game flow and interaction with the GM.
+
+Overall, this module structures how different role types behave during the night phase, providing a clear, extendable framework for implementing specific role logic.
+
+=== botc/behaviors/demons.py ===
+This Python file defines the behavior for the "Imp" demon role in a game.
+
+- **Purpose:** Implements the night action logic for the Imp role, allowing the player to select and attempt to kill another player during the night phase.
+
+- **Key class:**  
+  - `ImpBehavior(RoleBehavior)`: Registered as the behavior for the `RoleName.IMP`. It overrides the `act` method to handle the Imp's kill action.
+
+- **Important logic:**  
+  - The `act` method prompts the Imp player to choose a target from alive players (excluding themselves) via a Discord dropdown interface (`dmdropdown`).  
+  - If a target is selected and not protected, the target is marked as dead (`alive = False`) and recorded as killed that night.  
+  - If the target is protected (e.g., by a Monk), the kill fails and the target survives.  
+  - Debug print statements log the kill outcome and indicate the Imp player is put to sleep after acting.
+
+=== botc/behaviors/minions.py ===
+This Python file defines behavior classes for specific "minion" roles in a game, using an asynchronous framework to handle player actions during game nights.
+
+**Purpose:**
+- Implements role-specific behaviors for minion roles (Poisoner, Spy, Scarlet Woman) in a game.
+- Handles night-time actions and status changes for these roles.
+
+**Key Classes and Functions:**
+
+1. **PoisonerBehavior (RoleName.POISONER)**
+   - Priorities: first and other nights set to 1.
+   - `act`: Prompts the Poisoner player to select a target to poison from alive players.
+   - Sets the chosen target's status to poisoned.
+   - Sends updated game board info to the Poisoner.
+
+2. **SpyBehavior (RoleName.SPY)**
+   - Priorities: 2 on first night, 3 on other nights.
+   - `act`: Simply sends the Spy the current game board information each night.
+
+3. **ScarletWomanBehavior (RoleName.SCARLET_WOMAN)**
+   - Priority: 4 on other nights.
+   - `act`: Checks if the Imp (another role) is dead and if at least 5 players remain alive.
+   - If conditions met, the Scarlet Woman assumes the Imp role, updating her role, alignment, and behavior accordingly.
+   - Sends a prompt informing the player of this role change.
+
+**Important Logic:**
+- Role behaviors are registered via a decorator `@register_role`.
+- Actions are asynchronous, involving player interaction via direct messages and polls.
+- The Scarlet Woman's role transformation is conditional on game state (Imp death and player count).
+- Poisoner actively modifies another player's status; Spy passively receives game info.
+- The file relies on external game management and command handling systems (`game.command_cog`).
+
+Overall, this module encapsulates how minion roles perform their night actions and interact with the game state.
+
+=== botc/behaviors/__init__.py ===
+This Python file defines a system for registering behavior classes to specific roles within a bot framework.
+
+- **Purpose:**  
+  To maintain a centralized mapping (`BEHAVIOR_MAP`) of role names to their corresponding behavior instances, enabling role-based behavior management.
+
+- **Key elements:**  
+  - `BEHAVIOR_MAP`: A dictionary mapping role names (strings) to behavior instances.  
+  - `register_role(*role_names)`: A decorator function that, when applied to a class, instantiates it and registers the instance under each provided role name in `BEHAVIOR_MAP`.
+
+- **Important logic:**  
+  The decorator automates the registration of behavior classes to roles by creating an instance of the class and associating it with each role name given. The file also imports several submodules (`base`, `demons`, `minions`, `outsiders`, `townsfolk`) to ensure their decorators execute and populate `BEHAVIOR_MAP`.
+
+=== botc/behaviors/outsiders.py ===
+This Python file defines behavior for an "Outsider" role in a game, specifically the "Butler" role.
+
+- **Purpose:**  
+  To implement the night action logic for the Butler role, which involves selecting a random player as their "master" and notifying the Butler of this assignment.
+
+- **Key class:**  
+  - `ButlerBehavior` (inherits from `RoleBehavior`):  
+    Defines the Butler's night action priorities and behavior.
+
+- **Important logic:**  
+  - The Butler acts during the night phases with specified priorities.  
+  - During its action (`act` method), it randomly selects one player from the game as the Butler's master.  
+  - Sends a direct message to the Butler player informing them who their master is.
+
+- **Additional notes:**  
+  - Uses a decorator `@register_role` to register the behavior with the role name `BUTLER`.  
+  - Relies on asynchronous messaging via `game.command_cog.send_direct_message`.
+
+=== botc/discord_manager/cogs/__init__.py ===
+The file `botc/discord_manager/cogs/__init__.py` is an empty initializer file for the `cogs` package within the `discord_manager` module of the `botc` project. Its purpose is to mark the directory as a Python package, enabling the import of cog modules that likely contain Discord bot extensions or commands. There are no functions, classes, or logic implemented in this file itself.
+
+=== botc/discord_manager/cogs/game_commands.py ===
+This Python file defines a Discord bot cog `GameCommands` for managing a social deduction game ("Blood on the Clocktower") via Discord interactions.
+
+**Purpose:**  
+Facilitate game setup, player management, and interactive communication with players through Discord commands and direct messages.
+
+**Key Components:**
+
+- **Class `GameCommands(commands.Cog)`**: Main cog integrating with the bot and game manager.
+
+- **Commands:**
+  - `set_seats`: Admin-only slash command to set player seating order by mentioning players in clockwise order. Validates mentions against current players and updates the game order.
+  - `open_lobby`: Admin command to open a lobby with a join button for players to enter the game.
+  - `start_game`: Admin command to close the lobby, add some hardcoded players (likely for testing), check player count, initiate a gamemaster poll, and start the game.
+  - `display_players`: Shows the current list of players in the game.
+  - `print_users`: Admin command to print all guild members' IDs and info to the terminal.
+
+- **Interactive DM Methods:**
+  - `dmdropdown`: Sends a dropdown selection menu via DM to a user, waits for response or timeout, returns selected options.
+  - `dmpoll`: Sends a poll via DM (using Discord's poll feature if available and appropriate), waits for votes, enforces max selection, and returns chosen options. Falls back to dropdown if options exceed limits.
+  - `send_direct_message`: Utility to send a plain DM to a user by username, with error handling for missing users or disabled DMs.
+
+**Important Logic:**
+
+- Player mentions are parsed and validated carefully in `set_seats` to ensure the seating order matches the active players exactly.
+- DM-based interactions (`dmdropdown` and `dmpoll`) handle user input asynchronously with timeouts and retries.
+- The `start_game` command includes a placeholder addition of two players and a minimum player count check before starting the game and running a gamemaster poll.
+- Lobby management uses interactive Discord views (`JoinLobbyView`) to allow players to join before the game starts.
+
+Overall, the file provides a robust interface for admins to manage game flow and for the bot to interact privately with players for selections and polls.
+

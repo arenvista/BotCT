@@ -1,0 +1,160 @@
+# High-Level Overview of the Codebase
+
+---
+
+## Project Purpose
+
+This project implements a Discord-based digital adaptation of the social deduction game **"Blood on the Clocktower" (BOTC)**. It provides:
+
+- Core game logic and state management for BOTC.
+- Role and player behavior modeling aligned with the game's mechanics.
+- Encounter/event system for narrative or gameplay events.
+- Discord bot integration for player interaction, game management, and voting.
+- Automated codebase summarization tooling using OpenAI GPT.
+
+---
+
+## Main Components / Modules
+
+### 1. **Core Game Logic (`botc.core`)**
+
+- **`game.py`**:  
+  Central `GameManager` class managing players, roles, game phases (day/night), voting, and integration with Discord. Handles role assignment, game flow, voting, and player state.
+
+- **`distribution.py`**:  
+  `RoleDistributor` class that determines balanced role counts for a given number of players (5-15), ensuring proper game setup.
+
+- **`__init__.py`**:  
+  Exposes `GameManager` and `RoleDistributor` for convenient imports.
+
+---
+
+### 2. **Player and Role Modeling (`botc`)**
+
+- **`player.py`**:  
+  Defines the `Player` class encapsulating player identity, roles (registered and believed), alignment, status (alive, poisoned, etc.), and role behavior. Supports asynchronous night actions.
+
+- **`enums.py`**:  
+  Defines enums and dataclasses for player statuses, role alignments, role classes, and specific role names with metadata and helper methods.
+
+- **`__init__.py`**:  
+  Exposes key enums and the `Player` class at the package level.
+
+---
+
+### 3. **Role Behaviors (`botc.behaviors`)**
+
+- **`base.py`**:  
+  Abstract base classes for role behaviors categorized as:
+  - `InfoRoleBehavior` (roles that receive info),
+  - `ActionRoleBehavior` (roles that act on others),
+  - `PassiveBehavior` (roles that do nothing at night).
+
+- **`demons.py`, `minions.py`, `outsiders.py`, `townsfolk.py`**:  
+  Concrete implementations of role behaviors for specific roles, e.g., Imp (demon), Poisoner (minion), Butler (outsider), and various townsfolk roles.
+
+- **`__init__.py`**:  
+  Maintains a global `BEHAVIOR_MAP` linking role names to behavior instances via a decorator-based registration system.
+
+---
+
+### 4. **Encounter System (`botc.encounters`)**
+
+- **`base.py`**:  
+  Defines an abstract `Encounter` class with dependency and anti-dependency management, flags for possibility and resolution, and an async `resolve` method.
+
+- **`deck.py`**:  
+  Implements a deck of encounter cards, supporting loading from JSON, drawing cards based on dependencies, and tracking resolved encounters.
+
+- **`simple.py`**:  
+  Provides simple, mostly no-op encounters for testing.
+
+- **`enums.py`**:  
+  Defines string constants for encounter event types.
+
+- **`__init__.py`**:  
+  Finalizes encounter setup by linking dependencies and updating encounter possibilities.
+
+---
+
+### 5. **Discord Bot Integration (`botc.discord_manager`)**
+
+- **`bot.py`**:  
+  Defines `BotManager`, a subclass of `discord.py`'s `commands.Bot`, linking the Discord bot to the `GameManager`. Handles bot setup, command loading, and syncing.
+
+- **`polling.py`**:  
+  Implements `PollManager` for managing Discord polls for Game Master selection and execution votes, integrating poll results with game state.
+
+- **`views.py`**:  
+  Defines Discord UI components (`discord.ui.View` and `Select`) for interactive elements like execution voting dropdowns and lobby join buttons.
+
+- **`cogs/game_commands.py`**:  
+  Defines a Discord cog with slash commands for game setup, player management, seating order, lobby management, and direct message interactions (dropdowns and polls).
+
+- **`__init__.py`**:  
+  Exposes `BotManager`, `PollManager`, and `JoinLobbyView` for external use.
+
+- **`cogs/__init__.py`**:  
+  Empty package initializer for cogs.
+
+---
+
+### 6. **Codebase Summarization Tool (`api.py`)**
+
+- Automates summarizing Python files in the project using OpenAI GPT-4.1-mini.
+- Uses a map-reduce approach: per-file summaries followed by a global overview.
+- Saves summaries to text files.
+- Helps understand and document the codebase automatically.
+
+---
+
+## How Components Interact
+
+- **Game Logic & Player Modeling:**  
+  `GameManager` manages `Player` instances, assigning roles and linking each to a behavior from `botc.behaviors` via `BEHAVIOR_MAP`. Players perform asynchronous night actions through their behavior classes.
+
+- **Role Behaviors:**  
+  Behaviors implement role-specific logic, querying players or the GM, modifying player statuses, and interacting with the game state.
+
+- **Encounter System:**  
+  Encounters represent narrative or gameplay events with dependencies. The `Deck` manages encounter cards, drawing only possible encounters based on resolved dependencies.
+
+- **Discord Bot Integration:**  
+  The `BotManager` runs the Discord bot, loading commands from `game_commands.py`. It interacts with players via DMs and channels, using UI components (`views.py`) for voting and lobby joining.
+
+- **Polling:**  
+  `PollManager` runs polls for key game decisions (GM selection, executions), updating the `GameManager` state accordingly.
+
+- **Codebase Summarization:**  
+  The `api.py` script is external to the game logic but can be used to generate documentation or summaries of the codebase, aiding developers.
+
+---
+
+## Architectural Patterns and Design
+
+- **Modular Design:**  
+  Clear separation between core game logic, role behaviors, encounter management, and Discord integration.
+
+- **Decorator-based Registration:**  
+  Role behaviors and encounters use decorators to register classes to global maps, enabling dynamic lookup and extensibility.
+
+- **Asynchronous Programming:**  
+  Extensive use of `async`/`await` to handle Discord interactions, player prompts, and game phases without blocking.
+
+- **Dependency Injection:**  
+  Behaviors receive `game` and `player` objects, allowing them to query and modify game state.
+
+- **Map-Reduce Summarization Pattern:**  
+  The `api.py` uses a map-reduce style approach to summarize code files individually and then collectively.
+
+- **Discord UI Components:**  
+  Custom views and dropdowns provide interactive, user-friendly interfaces for game actions within Discord.
+
+- **Stateful Game Management:**  
+  The `GameManager` maintains comprehensive state, including player statuses, role assignments, voting tables, and game phases.
+
+---
+
+## Summary
+
+This project is a comprehensive, asynchronous, and modular implementation of the "Blood on the Clocktower" game for Discord. It models complex role behaviors, manages game state and encounters, and integrates tightly with Discord for player interaction and game management. The codebase also includes tooling to auto-generate summaries of its own source code using OpenAI's GPT models, facilitating maintainability and understanding.

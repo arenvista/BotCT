@@ -1,0 +1,134 @@
+1) What the project does
+- Primary goal: Run a Discord-hosted game of Blood on the Clocktower (BotC)
+  - Manages lobby and seating, assigns roles according to official distributions, and orchestrates the day/night cycle.
+  - Implements role behaviors (night actions and information) with GM override hooks.
+  - Conducts in-channel and DM-based interactions using Discord components (dropdowns, buttons) and Polls (for GM selection and execution voting).
+  - Tracks player status and game state (alive/dead, poisoned, protected, executed tonight, etc.) and renders a board view for admins/players.
+- Secondary/prototype feature: An “encounters” system (deck of events) with dependency and anti-dependency constraints; currently included but minimally integrated.
+- Development utilities: Two CLI scripts (api.py, api5.py) that use OpenAI models to summarize a Python codebase using a map-reduce prompting strategy and emit text reports. These are not part of the game runtime.
+
+
+2) Core modules/components
+- Domain model and state
+  - botc.enums: Alignment (GOOD/EVIL), RoleClass (GAMEMASTER, DEMONS, MINIONS, OUTSIDERS, TOWNSFOLK), RoleName (concrete roles with embedded role_class metadata), and Status (poisoned, drunk, protected, alive, red_herring, plus derived properties).
+  - botc.player.Player: Represents a player with name, believed_role, registered_role, registered_alignment, Status, and a bound role behavior.
+- Role behavior system
+  - botc.behaviors.base: Behavior framework and templates (RoleBehavior, InfoRoleBehavior, ActionRoleBehavior, PassiveBehavior) with a GM override flow and reliability gating.
+  - botc.behaviors.(townsfolk|minions|demons|outsiders): Concrete implementations (e.g., Washerwoman, Chef, Monk, Fortune Teller, Undertaker; Poisoner, Spy, Scarlet Woman; Imp; Butler).
+  - botc.behaviors.__init__: BEHAVIOR_MAP registry and @register_role decorator that instantiates and registers behavior instances at import.
+- Game orchestration
+  - botc.core.game.GameManager: The central coordinator for role assignment, night/day phases, wake order scheduling, Discord integrations (DMs and polls), and state transitions.
+  - botc.core.distribution.RoleDistributor: Encodes official player-count-to-role-count mapping (5–15 players).
+  - botc.core.__init__ and botc.__init__: Re-export conveniences for a clean public API.
+- Discord integration
+  - botc.discord_manager.bot.BotManager: Configures intents, loads the GameCommands cog, and syncs app commands to a dev guild.
+  - botc.discord_manager.cogs.game_commands.GameCommands: Slash/legacy commands for lobby management, game start, seating, DM helpers (dropdowns and polls), and admin utilities.
+  - botc.discord_manager.views: Discord UI components (JoinLobbyView, ExecutionView with ExecutionDropdown, generic DropdownView).
+  - botc.discord_manager.polling.PollManager: Orchestrates a GM-selection poll and an execution vote, tallying results and updating game state.
+  - botc.discord_manager.__init__: Facade exporting BotManager, PollManager, and JoinLobbyView.
+- Encounters subsystem (prototype)
+  - botc.encounters.base: Encounter base class, registry (ENCOUNTER_MAP), availability flags, and recomputation (update_possibilities).
+  - botc.encounters.enums: String constants for event identifiers.
+  - botc.encounters.simple: Sample encounters for testing dependencies/anti-dependencies and one-shot mechanics.
+  - botc.encounters.deck: Deck that loads encounter weights from JSON, draws eligible cards, and updates availability.
+  - botc.encounters.__init__: Wires name-based dependencies into object references and triggers an availability recompute.
+- Code summarization tools (dev utilities)
+  - api.py: Uses Chat Completions; synchronous map (per-file) and reduce (aggregate) to produce file_summaries.txt and final_summary.txt.
+  - api5.py: Uses Responses API (with reasoning/text options), similar map-reduce pipeline; excludes common non-source directories.
+
+
+3) How components interact
+- End-to-end game flow
+  - Lobby and seating: Admin opens a lobby (JoinLobbyView). Players join by clicking a persistent button that appends their names to game.player_names. An admin locks seating via set_seats by mentioning users in the desired order.
+  - GM selection: start_game triggers PollManager.run_gamemaster_poll in a public thread. Players in the allowed list vote “Yes/No,” candidates are filtered by their usernames/global_names, and a GM is chosen at random among “Yes” voters. GameManager.game_master is set and lists updated to remove the GM if needed.
+  - Role assignment and messaging: GameManager assigns roles using RoleDistributor and RoleName pools, applies Baron, Drunk, and Spy mechanics (believed vs registered roles), and instantiates Player objects. Players are DM’d their role information via GameCommands.
+  - Night actions (wake order): GameManager gets an ordered list by sorting players on first_night_priority or other_night_priority from their bound behavior. Each behavior runs asynchronously:
+    - Info roles obtain truthful or dishonest info based on player.status.is_reliable, with GM override opportunities. Results are DM’d to the player.
+    - Action roles (e.g., Monk, Poisoner, Imp) prompt the acting player (or GM) via DM dropdowns/polls and apply effects (protected, poisoned, kills, etc.). Game state (e.g., killed_tonight) is updated for downstream roles (e.g., Ravenkeeper).
+  - Daytime and execution: PollManager.run_execution_poll builds a custom ExecutionView for alive players to select a target (or Skip Vote), waits for votes, checks for a strict majority, updates player status and game.executed_player, and announces results.
+  - State maintenance: Each cycle, temporary flags (protected, poisoned) are reset. Separate lists (players and players_alive) and Status.alive flags must remain consistent when players die.
+- Behavior dispatch
+  - Player’s role_behavior is drawn from BEHAVIOR_MAP using believed_role, enabling registration-based polymorphism. Some roles can mutate behavior at runtime (e.g., Scarlet Woman becomes Imp by swapping role and role_behavior).
+- Discord infrastructure
+  - BotManager injects the GameManager into GameCommands; Command methods call back into game (e.g., get_board_str) and PollManager; component Views (ExecutionView/DropdownView/JoinLobbyView) are attached to messages; DM helper methods (dmdropdown/dmpoll) are used by behaviors and GM override flows.
+- Encounters subsystem
+  - Imported at package load to register and wire Encounter singletons. Deck.from_json builds a draw pile by duplicating EncounterCard entries for weighting. On draw, encounter.resolved is set and update_possibilities recomputes availability. Although GameManager loads a default deck, example calls are currently commented out, so it’s more of a ready-to-integrate module.
+
+
+4) Architectural patterns
+- Strategy/registry for role behaviors
+  - @register_role binds RoleName(s) to a behavior class instance, placing it in BEHAVIOR_MAP. Player instances delegate action to these strategies, enabling clean separation of per-role logic.
+- Template Method for night actions
+  - InfoRoleBehavior and ActionRoleBehavior define high-level act flows (default data/target, optional GM override, then send/execute), while subclasses implement specific hooks.
+- Facade/public-API modules
+  - __init__ files re-export key classes to simplify imports and stabilize the public surface (botc, botc.core, botc.discord_manager, botc.encounters).
+- Plugin-like encounter system
+  - Decorator-driven registration (ENCOUNTER_MAP), two-phase dependency wiring by name → object, and global recomputation of availability after state changes.
+- Async, event-driven orchestration
+  - Night/day cycles, Discord I/O, and user interactions are all asynchronous and awaitable; polling loops with sleeps periodically refetch remote state (e.g., message.poll) for progress.
+- Data-driven configuration
+  - Role distributions via a hard-coded table, encounter deck composition via JSON resource files, display formatting standardized in enums to keep UI consistent.
+- Map-reduce summarization (dev scripts)
+  - Per-file “map” summarizations followed by an aggregate “reduce” step using LLM prompts and context-size capping.
+
+
+5) Notable design decisions and issues
+- Strong modeling of BotC’s information asymmetry
+  - believed_role vs registered_role vs registered_alignment separate “what the player sees,” “how they register to abilities,” and “their team,” enabling Drunk and Spy mechanics and dynamic role changes (e.g., Scarlet Woman → Imp). This is a solid, extensible design.
+- Behavior instance reuse
+  - register_role creates one instance per behavior class shared across roles. This is efficient but assumes behaviors are stateless; any per-player or per-night mutable state in a behavior would leak across players.
+- Status gating and priorities
+  - Reliability (poisoned/drunk) cleanly gates info truthfulness; first-night/other-night priorities provide a transparent scheduler input for wake order.
+- Global registries and import-time side effects
+  - BEHAVIOR_MAP and ENCOUNTER_MAP are module-level singletons populated at import. This simplifies discovery but:
+    - Couples initialization to import order.
+    - Complicates testing and hot-reload (re-import can duplicate links in encounters.__init__).
+    - Prevents running multiple independent games/encounter decks in one process without careful isolation.
+- Discord integration quality and consistency
+  - Good coverage of components (Views, Polls, DM helpers) and admin workflows, but with several sharp edges:
+    - Identity handling: Many paths match users by user.name/global_name instead of immutable IDs. This risks collisions and breakage on rename and makes allowed_player_ids vs recorded vote keys inconsistent (execution poll comment vs code). Recommendation: normalize on user IDs end-to-end for votes, DM, seating, and allowlists.
+    - Interaction response rules: JoinLobbyView calls interaction.response twice in one callback; subsequent responses must use interaction.followup. There’s also an ephemeral misuse in a legacy prefix command (ephemeral not supported).
+    - Poll semantics:
+      - GM poll early-exit tallies all voters, not only the allowed cohort, which can prematurely stop the loop.
+      - Execution poll uses strict >50% majority; ties or exactly 50% fail (may be intended); “Skip Vote” can win with a majority.
+      - Votes are stored by username in ExecutionDropdown; two users with the same name collide.
+      - dmpoll in DMs relies on discord.Poll; depending on Discord API versions, Polls may be limited or unsupported in DMs.
+    - Caching and fetch: Some DM helpers rely solely on bot.users (cache) and exact name/global_name matching; safer patterns would resolve by ID and fetch when missing.
+    - Persistence: ExecutionDropdown lacks a custom_id, so it won’t persist across bot restarts; JoinLobbyView’s button does and could be made persistent.
+- Game logic correctness and robustness
+  - Player state
+    - There’s both a players_alive list and a Status.alive flag; these must be kept in sync manually. Centralizing on Status.alive and deriving players_alive on demand would reduce drift risk.
+    - Player._to_dict duplicates the "registered_role" key and omits key fields (player_name, vote_token); show_role relies on enum __str__ (okay if customized).
+    - GameManager.__init__ uses a mutable default argument (player_names=[]), which can cause shared state across instances.
+  - Role distribution
+    - RoleDistributor keys only support 5–15 players; lower counts raise KeyError. Add validation and user-facing errors for unsupported sizes.
+  - Night/day counters and wake order
+    - Counters incrementing just before/after actions can be clarified to align with human expectations in messaging.
+  - Behaviors
+    - Butler selects any master, including self and dead players, and doesn’t persist the selection for enforcing day-phase voting restrictions.
+    - Poisoner prompt typos and debug prints; Spy and Poisoner send board strings but Scarlet Woman role-change isn’t announced to the player.
+    - Imp excludes self-targeting (may be intended), checks protection; ensure protection check reads Status.protected consistently and that kills update Status.alive (not a separate attribute).
+    - get_filtered_players uses set subtraction for exclusions, which can reorder players unpredictably; it also treats role_names_believed the same as registered roles, which may not reflect intended mechanics.
+- Encounters subsystem gaps
+  - Anti-dependency logic bug: update_possibilities sets impossible=True only if all anti-dependencies are resolved; the docstring implies it should be impossible if any are resolved. This changes game semantics; fix to any().
+  - Global singletons mean multiple Decks or concurrent games will share Encounter state. Encapsulate encounter graphs per game or guard mutations if multi-game support is needed.
+  - draw_card may raise if unresolved cards exist but none are eligible; handle the “no eligible draw” case explicitly.
+  - Wiring appends to lists without clearing; re-imports can duplicate dependency links.
+- Polling and tallying details
+  - Execution votes are keyed to usernames, allowed list is named allowed_player_ids (strings), and GM poll filters by allowed names. Standardize to IDs and enforce a single key type consistently throughout.
+- Dev/test leftovers and configuration
+  - Debug injection of many placeholder players in GameCommands.start_game should be gated or removed.
+  - SERVER_ID needs casting to int; use explicit handling rather than a bare except.
+  - dotenv is used for Discord token/guild; ensure secrets aren’t logged.
+- Summarization scripts (api.py, api5.py)
+  - Solid map-reduce prompting design with content truncation and progress logging, but sequential and unsharded; large repos may exceed context in the reduce phase.
+  - api5.py uses a placeholder model name ("gpt-5") and the Responses API; both scripts lack retries/backoff and concurrency; os is imported but unused in some places.
+
+Practical improvements to consider next
+- Standardize on Discord user IDs everywhere (votes, DMs, seating, allowlists), and store/display a friendly name alongside for UX.
+- Fix JoinLobbyView double-response and other interaction response mismatches; ensure all UI components used in long-lived flows have custom_id for persistence as needed.
+- Unify alive state and derive players_alive when needed; make death a single function that updates Status.alive and prunes any derived collections.
+- Harden RoleDistributor and start_game validation (min/max player counts), and remove debug data injection.
+- Address encounters anti-dependency logic, eligibility edge cases, and encapsulate encounter state per game instance if you expect multiple games.
+- Add telemetry/logging around vote tallies and GM changes; announce impactful role changes (e.g., Scarlet Woman promotion) to the affected player.
+- Consider introducing retries/backoff and optional concurrency in OpenAI API usage, and chunk/summarize in tiers for large repos.
