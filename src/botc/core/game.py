@@ -1,10 +1,10 @@
 import random
 import os
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Dict
 import discord
 from dotenv import load_dotenv
 
-from botc.enums import Alignment, RoleClass, RoleName
+from botc.enums import Alignment, RoleClass, RoleName, Status
 from botc.player import Player
 from botc.core.distribution import RoleDistributor
 from botc.encounters import Deck
@@ -16,46 +16,100 @@ from botc.discord_manager.cogs.game_commands import GameCommands
 
 from dataclasses import dataclass
 
+
+class EventManager:
+    def __init__(self):
+        self.event_interval = 1  # how frequently to do an event, hardcoded for now
+        self.event_deck = Deck.from_json("default")
+
+    # def CallEvent(self, game: 'GameManager'):
+    #     if self.event_deck:
+    #         card = self.event_deck.draw_card()
+    #         await interaction.channel.send(card.specific_encounter.flavor_text) 
+    #         await card.specific_encounter.resolve(self)
+
 @dataclass
 class Counters:
     turn: int = 0
     day: int = 0
     night: int = 0
 
-class PlayerManager():
-    def __init__(self, player_names: List[str] = []):
-        self.player_names = player_names
-        self.roles_distribution = RoleDistributor(self.player_names)
-        self.player_list: List[Player] = self.roles_distribution.assign_roles()
+class PlayerManager:
+    def __init__(self, player_names: Optional[List[str]] = None):
+        self.player_names = player_names or []
+        self.player_list: List[Player] = []
 
-    @property 
-    def players_alive(self) -> List[Player]:
-        return [player for player in self.player_list if player.status.alive]
+    def assign_roles(self):
+        self.player_list = RoleDistributor(self.player_names).assign_roles()
+
+    def get_players(self, filter_status: Optional[Dict[str, bool|int]] = None, filter_role: Optional[List[RoleName]] = None, is_registered_role: bool = True) -> List[Player]:
+        """
+        Returns a list of players whose statuses match all conditions in the filters dict.
+        Example: get_filtered_players({"poisoned": False, "alive": True})
+        """
+        if filter_status is None: filter_status = {}
+        if filter_role is None: filter_role = []
+
+        player_status_filtered = [
+            p for p in self.player_list
+            if all(getattr(p.status, attr_name) == required_state for attr_name, required_state in filter_status.items())
+        ]
+
+        if not filter_role: 
+            return player_status_filtered
+            
+        if is_registered_role: 
+            return [p for p in player_status_filtered if p.registered_role in filter_role]
+        else: 
+            return [p for p in player_status_filtered if p.believed_role in filter_role]
+
+    def get_player(self, username) -> Optional[Player]:
+        for p in self.player_list:
+            if p.username == username: 
+                return p
+        return None
 
 
-
-class EventManager():
-    def __init__(self):
-        self.event_interval=1 #how frequently to do an event, hardcoded for now
-        self.event_deck=Deck.from_json("default")
-
-
-@dataclass
-class VoteTable():
-    vote_table: dict[str, dict[str, int]] = {}
-
-class ExecuteManager():
-    def __init__(self):
-        self.killed_tonight: Optional[Player] = None
+class DayManager:
+    def __init__(self, game: 'GameManager'):
+        self.game = game
+        self.vote_table: dict[str, dict[str, int]] = {}
         self.executed_player: str = ""
-        self.player_names: List[str] = []
+
     def reset_vote_table(self):
+        # Pull names directly from game to avoid empty list bugs
+        player_names = [p.username for p in self.game.get_players()]
         self.vote_table = {
-            voter: {candidate: 0 for candidate in self.player_names}
-            for voter in self.player_names
+            voter: {candidate: 0 for candidate in player_names}
+            for voter in player_names
         }
 
-class DiscordManager():
+    async def start_voting_phase(self, interaction: discord.Interaction):
+        allowed_usernames = [player.username for player in self.game.get_players() if player.status.can_vote] 
+        try:
+            await self.game.mgr_discord.poll_manager.run_execution_poll(interaction, allowed_usernames)
+        except Exception as e:
+            print(f"⚠️ Error executing poll: {e}")
+            if not interaction.response.is_done():
+                await interaction.response.send_message("System Error: Could not load the polling module.", ephemeral=True)
+
+
+class NightManager:
+    def __init__(self, game: 'GameManager'):
+        self.game = game
+
+    def get_wake_order(self, is_first_night: bool) -> List[Player]:
+        waking_players = []
+        # Fixed scope issue: changed 'game' to 'self.game'
+        for player in self.game.get_players():
+            priority = player.role_behavior.first_night_priority if is_first_night else player.role_behavior.other_night_priority
+            if priority is not None: 
+                waking_players.append((priority, player))
+                
+        waking_players.sort(key=lambda x: x[0])
+        return [p for priority, p in waking_players]
+
+class DiscordManager:
     def __init__(self, game: 'GameManager'):
         # Init bot components
         load_dotenv()
@@ -64,105 +118,89 @@ class DiscordManager():
         self.poll_manager = PollManager(game)
         self.command_cog = GameCommands(self.bot, game)
 
-    async def modify_information(self, target: str, message: str, choices: List[str], max_input: int):
+    async def send_message(self, username, content):
+        await self.command_cog.send_direct_message(username, content)
+
+    async def send_query(self, target: str, message: str, choices: List[str], max_input: int):
         return await self.command_cog.dmpoll(target, message, choices, max_input)
+
+    def run_bot(self):
+        self.bot.run(self.token)
+
 
 class GameManager:
     def __init__(self):
         self.game_over: bool = False
-        self.counter = Counters
+        self.counter = Counters() # Added parentheses to instantiate
         self.game_master: str = ""
         self.mgr_player: PlayerManager = PlayerManager()
+        self.mgr_night: NightManager = NightManager(self)
+        self.mgr_day: DayManager = DayManager(self)
+        self.killed_tonight: Player|None = None
+        self.mgr_discord: DiscordManager = DiscordManager(self)
+
+    def get_player(self, username) -> Player | None:
+        return self.mgr_player.get_player(username)
         
+    def get_players(self, filter_status: Optional[Dict[str, bool|int]] = None, filter_roles: Optional[List[RoleName]] = None) -> List[Player]:
+        if filter_status is None: filter_status = {}
+        if filter_roles is None: filter_roles = []
+        # Passed filter_roles down to the player manager
+        return self.mgr_player.get_players(filter_status, filter_roles)
+
     def resolve_temporary_conditions(self):
-        for player in self.players:
-            player.status.protected=False
-            player.status.poisoned=False
+        for player in self.mgr_player.player_list: 
+            player.status.resolve_temporary_conditions()
+
+    async def send_query(self, username, message, choices, max_input):
+        options = list(set([opt.username if hasattr(opt, 'username') else str(opt) for opt in choices]))
+        return await self.mgr_discord.send_query(username, message, choices, max_input)
+
+    async def send_message(self, username, content):
+        return await self.mgr_discord.send_message(username, content)
+
+    async def message_roles_to_players(self):
+        for player in self.get_players():
+            await self.send_message(player.username, player.show_role())
 
     async def start_game(self, interaction: discord.Interaction):
-        self.players_alive = self.players
+        # self.mgr_player.assign_roles()
         await self.message_roles_to_players()
 
-        for player in self.get_wake_order(is_first_night=True):
+        for player in self.mgr_night.get_wake_order(True):
             print("Calling " + player.registered_role.role_class.__str__())
             await player.take_action(self)
 
-        while(self.game_over != True):
-            self.night_counter+=1
+        while not self.game_over:
+            self.counter.night += 1 # Fixed variable name
             self.resolve_temporary_conditions()
-            await self.start_voting_phase(interaction)
-            self.day_counter+=1
+            await self.mgr_day.start_voting_phase(interaction)
             
-            # if self.event_deck:
-            #     card=self.event_deck.draw_card()
-            #     await interaction.channel.send(card.specific_encounter.flavor_text) 
-            #     await card.specific_encounter.resolve(self)
-            
-            for player in self.get_wake_order(is_first_night=False):
+            for player in self.mgr_night.get_wake_order(False):
                 await player.take_action(self)
 
-    async def message_roles_to_players(self):
-        for player in self.players:
-            await self.command_cog.send_direct_message(player.player_name, player.show_role())
-
-    async def start_voting_phase(self, interaction: discord.Interaction):
-        if not self.players_alive:
-            if not interaction.response.is_done():
-                await interaction.response.send_message("There are no alive players to vote!", ephemeral=True)
-            return
-
-        allowed_player_ids = [player.player_name for player in self.players_alive] 
-
-        try:
-            await self.poll_manager.run_execution_poll(interaction, allowed_player_ids)
-        except Exception as e:
-            print(f"⚠️ Error executing poll: {e}")
-            if not interaction.response.is_done():
-                await interaction.response.send_message("System Error: Could not load the polling module.", ephemeral=True)
-
     def get_alive_neighbors(self, target_player: Player) -> Tuple[Player, Player]:
-        index = self.players.index(target_player)
-        num_players = len(self.players)
+        index = self.get_players().index(target_player)
+        num_players = len(self.get_players())
+        player_list = self.get_players()
 
         right_idx = (index + 1) % num_players
-        while not self.players[right_idx].status.alive:
+        while not player_list[right_idx].status.alive:
             right_idx = (right_idx + 1) % num_players
             if right_idx == index: break
-        right_neighbor = self.players[right_idx]
+        right_neighbor = player_list[right_idx]
 
         left_idx = (index - 1) % num_players
-        while not self.players[left_idx].status.alive:
+        while not player_list[left_idx].status.alive:
             left_idx = (left_idx - 1) % num_players
             if left_idx == index: break
-        left_neighbor = self.players[left_idx]
+        left_neighbor = player_list[left_idx]
 
         return left_neighbor, right_neighbor
 
-    def get_player_by_role(self, target_role: RoleName) -> Optional[Player]:
-        for p in self.players:
-            if p.registered_role == target_role: return p
-        return None
-
-    def get_player_by_name(self, player_name="") -> Player:
-        if player_name == "":
-            player_name = input("Select Target: ")
-        for p in self.players:
-            if p.player_name == player_name: return p
-        raise ValueError(f"Player '{player_name}' not found.")
-
-    def get_wake_order(self, is_first_night: bool) -> List[Player]:
-        waking_players = []
-        for player in self.players:
-            priority = player.role_behavior.first_night_priority if is_first_night else player.role_behavior.other_night_priority
-            if priority is not None:
-                waking_players.append((priority, player))
-        
-        waking_players.sort(key=lambda x: x[0])
-        return [p for priority, p in waking_players]
-
     def get_board_str(self) -> str:
         output_str = "```\n" + "="*55 + "\n"
-        for i, player in enumerate(self.players):
+        for i, player in enumerate(self.get_players()):
             status = "Alive" if player.status.alive else "DEAD"
             poison_str = " [POISONED]" if player.status.poisoned else ""
             protect_str = " [PROTECTED]" if player.status.protected else ""
@@ -174,6 +212,6 @@ class GameManager:
             else:
                 role_info = f"{player.registered_role} ({player.registered_alignment})"
 
-            output_str += f"Seat {i+1:02d} | {player.player_name:<8} | {status:<5} | {role_info}{poison_str}{protect_str}\n"
+            output_str += f"Seat {i+1:02d} | {player.username:<8} | {status:<5} | {role_info}{poison_str}{protect_str}\n"
         output_str += "="*55 + "\n```"
         return output_str

@@ -1,29 +1,22 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, List, Optional
-
-import discord
-from discord.ext import commands
-from discord import app_commands
 import datetime
 import asyncio
 import re
 
+import discord
+from discord.ext import commands
+from discord import app_commands
+
 if TYPE_CHECKING:
     from botc.core.game import GameManager
-    from botc import Player
-    from botc import Alignment
     from botc.discord_manager.bot import BotManager
-    from botc.enums import RoleName
 
+from botc import Player, Alignment
+from botc.enums import RoleName, RoleClass
 from botc.discord_manager.views import JoinLobbyView, DropdownView
 from botc.discord_manager.polling import PollManager
 
-from botc import Player
-from botc.enums import RoleName, RoleClass
-
-from botc import Player
-from botc import Alignment
-from botc.enums import RoleName
 
 class GameCommands(commands.Cog):
     def __init__(self, bot: BotManager, game: GameManager) -> None:
@@ -34,15 +27,15 @@ class GameCommands(commands.Cog):
     @app_commands.describe(mentions="Tag all players in order: @player1 @player2 @player3...")
     @app_commands.default_permissions(manage_roles=True)
     async def set_seats(self, interaction: discord.Interaction, mentions: str) -> None:
-        if not self.game.players:
+        if not self.game.get_players():
             await interaction.response.send_message("❌ The game hasn't started yet!", ephemeral=True)
             return
 
         user_ids = re.findall(r'<@!?(\d+)>', mentions)
 
-        if len(user_ids) != len(self.game.players):
+        if len(user_ids) != len(self.game.get_players()):
             await interaction.response.send_message(
-                f"❌ You mentioned {len(user_ids)} players, but there are {len(self.game.players)} players in the game. Please mention everyone.",
+                f"❌ You mentioned {len(user_ids)} players, but there are {len(self.game.get_players())} players in the game. Please mention everyone.",
                 ephemeral=True
             )
             return
@@ -58,7 +51,7 @@ class GameCommands(commands.Cog):
                     return
             new_order_names.append(user.name)
 
-        current_names = [p.player_name for p in self.game.players]
+        current_names = [p.username for p in self.game.get_players()]
         missing_players = [name for name in current_names if name.lstrip('@').lower() not in new_order_names]
         extra_players = [name for name in new_order_names if name.lstrip('@').lower() not in current_names]
 
@@ -74,11 +67,11 @@ class GameCommands(commands.Cog):
 
         new_players_list = []
         for name in new_order_names:
-            player_obj = next(p for p in self.game.players if p.player_name == name)
+            player_obj = next(p for p in self.game.get_players() if p.username == name)
             new_players_list.append(player_obj)
 
-        self.game.players = new_players_list
-        self.game.player_names = new_order_names
+        self.game.mgr_player.player_list = new_players_list
+        self.game.mgr_player.player_names = new_order_names
 
         await interaction.response.send_message(
             f"✅ **Seating order locked in!**\n\n**New Grimoire Order:**\n{self.game.get_board_str()}", 
@@ -86,11 +79,9 @@ class GameCommands(commands.Cog):
         )
 
     async def dmdropdown(self, user_name: str, message_text: str, options: List[str], max_selection: int) -> Optional[List[str]]:
-        options=list(set(options))
+        options = list(set(options))
         if len(options) > 25:
             print("Too Many Options!")
-            print(options)
-            exit()
             raise ValueError("Dropdowns must have <= 25 options")
             
         clean_name: str = user_name.lstrip('@').lower()
@@ -124,7 +115,7 @@ class GameCommands(commands.Cog):
         return view.selected_values
 
     async def dmpoll(self, user_name: str, poll_message: str, poll_options: List[str], max_selection: int) -> Optional[List[str]]:
-        poll_options=list(set(poll_options))
+        poll_options = list(set(poll_options))
         if len(poll_options) > 10 or max_selection == 1:
             return await self.dmdropdown(user_name, poll_message, poll_options, max_selection)
         
@@ -187,7 +178,6 @@ class GameCommands(commands.Cog):
         if selected_count > max_selection:
             await live_message.end_poll() 
             await user.send(f"⚠️ **Oops!** You selected {selected_count} options, but the limit is {max_selection}. Let's try again.")
-            # Note: Updated recursion call to use user_name
             return await self.dmpoll(user_name, poll_message, poll_options, max_selection)
             
         try:
@@ -242,7 +232,7 @@ class GameCommands(commands.Cog):
     @app_commands.command(name="open_lobby", description="[Admin] Open a lobby for players.")
     @app_commands.default_permissions(manage_roles=True)
     async def open_lobby(self, interaction: discord.Interaction) -> None:
-        self.game.player_names = []
+        self.game.mgr_player.player_names = []
         view: JoinLobbyView = JoinLobbyView(self.game)
         
         embed: discord.Embed = discord.Embed(
@@ -255,37 +245,44 @@ class GameCommands(commands.Cog):
     @app_commands.command(name="start_game", description="[Admin] Close the lobby and deal roles.")
     @app_commands.default_permissions(manage_roles=True)
     async def start_game(self, interaction: discord.Interaction) -> None:
-        ROLES_DEMONS = RoleName.get_by_class(RoleClass.DEMONS)
-        ROLES_MINIONS = RoleName.get_by_class(RoleClass.MINIONS)
-        ROLES_OUTSIDERS = RoleName.get_by_class(RoleClass.OUTSIDERS)
-        ROLES_TOWNSFOLK = RoleName.get_by_class(RoleClass.TOWNSFOLK)
-        # Testing End Start
-        targets = ROLES_DEMONS + ROLES_MINIONS + ROLES_OUTSIDERS + ROLES_TOWNSFOLK
-        for r in targets:
-            self.game.players.append(Player("iiiii5184", r, r, Alignment.GOOD))
-
-        targets = ROLES_MINIONS + ROLES_OUTSIDERS + ROLES_TOWNSFOLK
-        counter = 0
-        for r in targets:
-            counter+=1
-            self.game.players.append(Player(f"Test{counter}", r, r, Alignment.GOOD))
-        # Testing End
-        num_players: int = len(self.game.player_names)
-        
-        if num_players < 0: 
-            await interaction.response.send_message(f"❌ You need at least 5 to play!", ephemeral=True)
-            return
+        num_players: int = len(self.game.mgr_player.player_names)
+        # if num_players < 5:  # Fixed from < 0
+        #     await interaction.response.send_message(f"❌ You need at least 5 to play!", ephemeral=True)
+        #     return
             
         await interaction.response.send_message("🚀 **The lobby is closed!** Starting GM Poll...")
         poll: PollManager = PollManager(self.game)
         self.game.game_master = await poll.run_gamemaster_poll(interaction)
-        await self.game.start_game(interaction)
+
+        # Testing End Start
+        ROLES_DEMONS = RoleName.get_by_class(RoleClass.DEMONS)
+        ROLES_MINIONS = RoleName.get_by_class(RoleClass.MINIONS)
+        ROLES_OUTSIDERS = RoleName.get_by_class(RoleClass.OUTSIDERS)
+        ROLES_TOWNSFOLK = RoleName.get_by_class(RoleClass.TOWNSFOLK)
+        targets = ROLES_DEMONS + ROLES_MINIONS + ROLES_OUTSIDERS + ROLES_TOWNSFOLK[:-10]
         
+        # Fixed: Append directly to the actual state, not a filtered copy
+        for r in targets: 
+            self.game.mgr_player.player_list.append(Player("iiiii5184", r, r, Alignment.GOOD))
+
+        targets = ROLES_MINIONS + ROLES_OUTSIDERS + ROLES_TOWNSFOLK
+        counter = 0
+        for r in targets[0:3]:
+            counter += 1
+            self.game.mgr_player.player_list.append(Player(f"Test{counter}", r, r, Alignment.GOOD))
+        # Testing End
+
+        await self.game.start_game(interaction)
+
+    @app_commands.command(name="display_grimoire", description="Displays Game State")
+    async def display_grimoire(self, interaction: discord.Interaction) -> None:
+        await interaction.response.send_message(self.game.get_board_str(), ephemeral=True)
+
     @app_commands.command(name="display_players", description="Show the current players in the game!")
     async def display_players(self, interaction: discord.Interaction) -> None:
-        if not self.game.players:
+        if len(self.game.mgr_player.player_names) == 0: # Fixed inverted logic
             await interaction.response.send_message("❌ No players have joined.", ephemeral=True)
             return
             
-        player_list: str = "\n".join([f"✅ {p.player_name}" for p in self.game.players])
+        player_list: str = "\n".join([f"✅ {username}" for username in self.game.mgr_player.player_names])
         await interaction.response.send_message(f"**Current Players:**\n{player_list}")

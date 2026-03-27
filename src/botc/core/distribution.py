@@ -11,14 +11,20 @@ class RoleDistributor:
 
     def __init__(self, player_names: List[str]=[]):
         self.player_names = player_names
-        self.num_demons, self.num_outsiders, self.num_townsfolk, self.num_minions = self._calculate_role_counts()
+        self.num_demons = -1
+        self.num_outsiders = -1
+        self.num_townsfolk = -1
+        self.num_minions = -1
 
     def _calculate_role_counts(self):
         num_players = min(len(self.player_names), 15)
         return self.DISTRIBUTION_TABLE[num_players]
 
     def assign_roles(self) -> List[Player]:
-        if self.player_names == []: print("Can NOT Assign Roles, Empty")
+        self.num_demons, self.num_outsiders, self.num_townsfolk, self.num_minions = self._calculate_role_counts()
+        if self.player_names == []:
+            print("Can NOT Assign Roles, Empty")
+            exit()
 
         ROLES_DEMONS = RoleName.get_by_class(RoleClass.DEMONS)
         ROLES_MINIONS = RoleName.get_by_class(RoleClass.MINIONS)
