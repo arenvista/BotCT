@@ -81,9 +81,9 @@ def async_pair(monkeypatch):
     def get_mock_resolve_temporary_conditions(counter):
         def _mock_resolve_temporary_conditions(self): #mocking this to eventually end the game after n turns
             for player in self.players:
-                player.protected=False
-                player.poisoned=False
-            if self.day_counter==counter:
+                player.status.protected=False
+                player.status.poisoned=False
+            if self.night_counter>=counter:
                 self.game_over=True
         return _mock_resolve_temporary_conditions
     
@@ -150,3 +150,27 @@ async def test_wizard_angry(async_pair,monkeypatch):
         if name =="demon":
             assert message.find("he wizard senses your malevolence")!=-1
             break
+        
+@pytest.mark.asyncio
+async def test_chosen(async_pair,monkeypatch):
+    interaction,get_mock_resolve_temporary_conditions=async_pair
+    
+    
+    monkeypatch.setattr(GameManager,"resolve_temporary_conditions",get_mock_resolve_temporary_conditions(1)) #how many nights we're doing this for
+    
+    players=[Player(f"p_{n}",RoleName.WASHERWOMAN,RoleName.WASHERWOMAN,Alignment.GOOD) for n in range(5)]
+    game=GameManager([p.player_name for p in players])
+    monkeypatch.setattr(game, "assign_roles",lambda *args: players)
+    monkeypatch.setattr(game.command_cog,"dmdropdown",AsyncMock(side_effect=lambda *args: ["p_0"]))
+    
+    message_queue=[]
+    async def mock_direct_message(user_name: str, message: str):
+        nonlocal message_queue
+        message_queue.append([user_name,message])
+        return True
+    
+    monkeypatch.setattr(game.command_cog,"send_direct_message",mock_direct_message)
+    game.event_deck=Deck([ENCOUNTER_MAP[CHOSEN_ONE]],[10])
+    
+    await game.start_game(interaction)
+    assert game.players[0].status.protected==True
