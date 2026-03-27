@@ -123,7 +123,7 @@ class PollManager:
         print("Made view")
 
         embed = discord.Embed(
-            title=f"Who should be executed? 🪢",
+            title=f"Who should be executed? 🏛️",
             description="Select a player from the dropdown menu below to cast your vote.\n*You may change your vote at any time before the timer runs out.*", 
             color=discord.Color.dark_red()
         )
