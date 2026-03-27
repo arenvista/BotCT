@@ -5,13 +5,11 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, Dict, Optional
 
 from botc.enums import RoleName
-
 from . import register_role
 
 if TYPE_CHECKING:
     from botc.core.game import GameManager
     from botc.player import Player
-
 
 class RoleBehavior(ABC):
     """The absolute root of all roles."""
@@ -41,8 +39,10 @@ class RoleBehavior(ABC):
         # Return True if they clicked "No" (meaning, DO NOT skip manual entry)
         return gm_skip is not None and gm_skip[0] == "No"
 
+
+
     @abstractmethod
-    async def act(self, player: Player, game: GameManager) -> None:
+    async def act(self, player: Player, game: GameManager) -> Any:
         """Every role must do *something* at night."""
         pass
 

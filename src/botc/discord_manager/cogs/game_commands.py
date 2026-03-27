@@ -250,39 +250,60 @@ class GameCommands(commands.Cog):
         #     await interaction.response.send_message(f"❌ You need at least 5 to play!", ephemeral=True)
         #     return
             
-        await interaction.response.send_message("🚀 **The lobby is closed!** Starting GM Poll...")
+        await interaction.response.send_message("🔒 **The lobby is closed!** Starting GM Poll...")
         poll: PollManager = PollManager(self.game)
         self.game.game_master = await poll.run_gamemaster_poll(interaction)
 
-        # Testing End Start
-        ROLES_DEMONS = RoleName.get_by_class(RoleClass.DEMONS)
-        ROLES_MINIONS = RoleName.get_by_class(RoleClass.MINIONS)
-        ROLES_OUTSIDERS = RoleName.get_by_class(RoleClass.OUTSIDERS)
-        ROLES_TOWNSFOLK = RoleName.get_by_class(RoleClass.TOWNSFOLK)
-        targets = ROLES_DEMONS + ROLES_MINIONS + ROLES_OUTSIDERS + ROLES_TOWNSFOLK[:-10]
+        # # Testing End Start
+        # ROLES_DEMONS = RoleName.get_by_class(RoleClass.DEMONS)
+        # ROLES_MINIONS = RoleName.get_by_class(RoleClass.MINIONS)
+        # ROLES_OUTSIDERS = RoleName.get_by_class(RoleClass.OUTSIDERS)
+        # ROLES_TOWNSFOLK = RoleName.get_by_class(RoleClass.TOWNSFOLK)
+        # targets = ROLES_DEMONS + ROLES_MINIONS + ROLES_OUTSIDERS + ROLES_TOWNSFOLK[:-10]
         
         # Fixed: Append directly to the actual state, not a filtered copy
-        for r in targets: 
-            self.game.mgr_player.player_list.append(Player("iiiii5184", r, r, Alignment.GOOD))
-
-        targets = ROLES_MINIONS + ROLES_OUTSIDERS + ROLES_TOWNSFOLK
-        counter = 0
-        for r in targets[0:3]:
-            counter += 1
-            self.game.mgr_player.player_list.append(Player(f"Test{counter}", r, r, Alignment.GOOD))
+        # for r in targets: 
+        r = RoleName.IMP
+        self.game.mgr_player.player_list.append(Player("iiiii5184", r, r, Alignment.GOOD))
+        r = RoleName.SLAYER
+        self.game.mgr_player.player_list.append(Player("microsina", r, r, Alignment.GOOD))
+        r = RoleName.SOLDIER
+        self.game.mgr_player.player_list.append(Player("bakerthebread", r, r, Alignment.GOOD))
+        # targets = ROLES_MINIONS + ROLES_OUTSIDERS + ROLES_TOWNSFOLK
+        # counter = 0
+        # for r in targets[0:3]:
+        #     counter += 1
+        #     self.game.mgr_player.player_list.append(Player(f"Test{counter}", r, r, Alignment.GOOD))
         # Testing End
 
         await self.game.start_game(interaction)
 
+    @app_commands.command(name="slay", description="Slay dem demons")
+    @app_commands.describe(target="Slay dem demons")
+    async def slay(self, interaction: discord.Interaction, target: discord.Member) -> None:
+        await interaction.response.send_message(f"{interaction.user.name} draws his big, fat sword and attempts to slay {target.name}! ⚔️")
+        
+        target_player = self.game.get_player(target.name)
+        myself = self.game.get_player(interaction.user.name)
+        
+        if target_player and target_player.registered_role == RoleName.IMP:
+            if myself and myself.registered_role == RoleName.SLAYER:
+                await interaction.followup.send(f"The Imp {target.name} has been slain!")
+                return 
+                
+        await interaction.followup.send("This is a little awkward. Ineffective.")
+
     @app_commands.command(name="display_grimoire", description="Displays Game State")
     async def display_grimoire(self, interaction: discord.Interaction) -> None:
+        # if interaction.user.name == self.game.game_master:
         await interaction.response.send_message(self.game.get_board_str(), ephemeral=True)
 
     @app_commands.command(name="display_players", description="Show the current players in the game!")
     async def display_players(self, interaction: discord.Interaction) -> None:
+        print("Hiiiiiii")
         if len(self.game.mgr_player.player_names) == 0: # Fixed inverted logic
             await interaction.response.send_message("❌ No players have joined.", ephemeral=True)
             return
             
-        player_list: str = "\n".join([f"✅ {username}" for username in self.game.mgr_player.player_names])
+        player_list: str = "\n".join([f"🪪 {username}" for username in self.game.mgr_player.player_names])
         await interaction.response.send_message(f"**Current Players:**\n{player_list}")

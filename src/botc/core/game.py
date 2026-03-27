@@ -153,7 +153,6 @@ class GameManager:
             player.status.resolve_temporary_conditions()
 
     async def send_query(self, username, message, choices, max_input):
-        options = list(set([opt.username if hasattr(opt, 'username') else str(opt) for opt in choices]))
         return await self.mgr_discord.send_query(username, message, choices, max_input)
 
     async def send_message(self, username, content):
@@ -163,21 +162,29 @@ class GameManager:
         for player in self.get_players():
             await self.send_message(player.username, player.show_role())
 
+
+    async def day_events(self, interaction: discord.Interaction):
+        self.counter.day += 1
+        self.resolve_temporary_conditions()
+        await self.mgr_day.start_voting_phase(interaction)
+
+    async def night_events(self):
+        if self.counter.night == 1:
+            #Start of 1st Night
+            for player in self.mgr_night.get_wake_order(True):
+                print("Calling " + player.registered_role.role_class.__str__())
+                await player.take_action(self)
+        else:
+            for player in self.mgr_night.get_wake_order(False):
+                await player.take_action(self)
+        self.counter.night += 1
+
     async def start_game(self, interaction: discord.Interaction):
         # self.mgr_player.assign_roles()
         await self.message_roles_to_players()
+        await self.night_events()
+        await self.day_events(interaction)
 
-        for player in self.mgr_night.get_wake_order(True):
-            print("Calling " + player.registered_role.role_class.__str__())
-            await player.take_action(self)
-
-        while not self.game_over:
-            self.counter.night += 1 # Fixed variable name
-            self.resolve_temporary_conditions()
-            await self.mgr_day.start_voting_phase(interaction)
-            
-            for player in self.mgr_night.get_wake_order(False):
-                await player.take_action(self)
 
     def get_alive_neighbors(self, target_player: Player) -> Tuple[Player, Player]:
         index = self.get_players().index(target_player)
@@ -199,7 +206,7 @@ class GameManager:
         return left_neighbor, right_neighbor
 
     def get_board_str(self) -> str:
-        output_str = "```\n" + "="*55 + "\n"
+        output_str = "The Grimoire 📔:\n" + "```\n" + "="*55 + "\n"
         for i, player in enumerate(self.get_players()):
             status = "Alive" if player.status.alive else "DEAD"
             poison_str = " [POISONED]" if player.status.poisoned else ""
