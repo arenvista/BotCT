@@ -3,9 +3,9 @@ from botc.encounters import simple,deck,ENCOUNTER_MAP,Deck
 from botc.encounters.enums import *
 from botc.encounters.base import reset_resolved
 from botc.core.game import GameManager
-from botc.behaviors.base import RoleBehavior,RoleName
+from botc.behaviors.base import RoleBehavior
 from botc.behaviors import BEHAVIOR_MAP
-from botc.enums import Status,Alignment
+from botc.enums import Status,Alignment,RoleClass,RoleName
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 from botc.discord_manager import PollManager
@@ -174,3 +174,29 @@ async def test_chosen(async_pair,monkeypatch):
     
     await game.start_game(interaction)
     assert game.players[0].status.protected==True
+    
+@pytest.mark.asyncio
+async def test_pacifism(async_pair,monkeypatch):
+    interaction,get_mock_resolve_temporary_conditions=async_pair
+    monkeypatch.setattr(GameManager,"resolve_temporary_conditions",get_mock_resolve_temporary_conditions(3)) #how many nights we're doing this for
+    players=[Player(f"p_{n}",RoleName.WASHERWOMAN,RoleName.WASHERWOMAN,Alignment.GOOD) for n in range(5)]
+    players.append(Player("soldier",RoleName.SOLDIER,RoleName.SOLDIER,Alignment.GOOD))
+    monkeypatch.setattr(GameManager, "assign_roles",lambda *args: players)
+
+    game=GameManager([p.player_name for p in players])
+
+    
+    message_queue=[]
+    async def mock_direct_message(user_name: str, message: str):
+        nonlocal message_queue
+        message_queue.append([user_name,message])
+        return True
+    
+    monkeypatch.setattr(game.command_cog,"send_direct_message",mock_direct_message)
+    
+    monkeypatch.setattr(game.command_cog,"dmdropdown",AsyncMock(side_effect=lambda *args: [RoleName.CHEF.name]))
+    game.event_deck=Deck([ENCOUNTER_MAP[PACIFISM]],[10])
+    await game.start_game(interaction)
+    
+    for player in game.players:
+        assert player.registered_role.name!=RoleName.SOLDIER
