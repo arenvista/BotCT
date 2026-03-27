@@ -102,15 +102,17 @@ class ChosenEncounter(Encounter):
             chosen_player=await game.command_cog.dmdropdown(player.player_name,"Who has curried the favor of the gods?",[p.player_name for p in game.players],1)
             chosen_player=chosen_player[0]
             votes[chosen_player]=votes.get(chosen_player,0)+1
+        print(votes)
             
         most_popular_player=game.get_player_by_name(sorted([(v,k )for k,v in votes.items()],key=lambda x:x[0],reverse=True)[0][1])
-        most_popular_player.protected=True
+        most_popular_player.status.protected=True
+        
         
         for player in game.players:
             if player ==most_popular_player:
-                game.command_cog.send_direct_message(player.player_name,f" Go forth, paladin of light, and vanquish evil! ")
+                await game.command_cog.send_direct_message(player.player_name,f" Go forth, paladin of light, and vanquish evil! ")
             else:
-                game.command_cog.send_direct_message(player.player_name,f" The gods dont care for you. Stupid bitch. ")
+                await game.command_cog.send_direct_message(player.player_name,f" The gods dont care for you. Stupid bitch. ")
                 
 @register_encounter(ANGRY_WIZARD,[WIZARD_COME],[HAPPY_WIZARD,ANGRY_WIZARD],"Angry Wizard",
                     "The old man is pissed at your hospitality! He unleashes his magical fury on the townsfolk, blasting fireballs left and right"
@@ -119,7 +121,7 @@ class AngryWizardEncounter(Encounter):
     async def resolve(self,game,interaction: discord.Interaction):
         for player in game.players:
             if player.registered_alignment==Alignment.GOOD:
-                if random.random()<0.1 and not player.protected: #10% probability of getting murdered
+                if random.random()<0.1 and not player.status.protected: #10% probability of getting murdered
                     player.alive=False
                     await game.command_cog.send_direct_message(player.player_name,f" Fireball straight to the torso. You burn alive and are now dead ")
                 else:
