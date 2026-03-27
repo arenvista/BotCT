@@ -200,3 +200,27 @@ async def test_pacifism(async_pair,monkeypatch):
     
     for player in game.players:
         assert player.registered_role.name!=RoleName.SOLDIER
+        
+@pytest.mark.asyncio
+async def test_party(async_pair,monkeypatch):
+    interaction,get_mock_resolve_temporary_conditions=async_pair
+    monkeypatch.setattr(GameManager,"resolve_temporary_conditions",get_mock_resolve_temporary_conditions(1)) #how many nights we're doing this for
+    
+    players=[Player(f"p_{n}",RoleName.WASHERWOMAN,RoleName.WASHERWOMAN,Alignment.GOOD) for n in range(5)]
+    monkeypatch.setattr(GameManager, "assign_roles",lambda *args: players)
+
+    game=GameManager([p.player_name for p in players])
+    monkeypatch.setattr(game.command_cog,"dmdropdown",AsyncMock(side_effect=lambda *args: ["p_0"]))
+    
+    message_queue=[]
+    async def mock_direct_message(user_name: str, message: str):
+        nonlocal message_queue
+        message_queue.append([user_name,message])
+        return True
+    
+    monkeypatch.setattr(game.command_cog,"send_direct_message",mock_direct_message)
+    
+    game.event_deck=Deck([ENCOUNTER_MAP[PARTY]],[10])
+    await game.start_game(interaction)
+    
+    assert game.players[0].status.poisoned==True

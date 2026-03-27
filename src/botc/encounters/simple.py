@@ -74,21 +74,22 @@ class PartyEncounter(Encounter):
         }
         for player in game.players:
             chosen_player=await game.command_cog.dmdropdown(player.player_name,"Whos gonna get the most wasted?",[p.player_name for p in game.players])
-            votes[chosen_player.player_name]=votes.get(chosen_player,0)+1
+            chosen_player=chosen_player[0]
+            votes[chosen_player]=votes.get(chosen_player,0)+1
             
         most_popular_player=game.get_player_by_name(sorted([(v,k )for k,v in votes.items()],key=lambda x:x[0],reverse=True)[0][1])
         
-        most_popular_player.poisoned =True
+        most_popular_player.status.poisoned =True
         
         drunk_player_list=random.sample(game.players,3)
         drunk_player_list.append(most_popular_player)
         
         for target in drunk_player_list:
-            game.command_cog.send_direct_message(target.player_name,f"You feel queasy and have a headache... hopefully you're not drunk")
+            await game.command_cog.send_direct_message(target.player_name,f"You feel queasy and have a headache... hopefully you're not drunk")
             
         for player in game.players:
             if player not in drunk_player_list:
-                game.command_cog.send_direct_message(player.player_name,f"Someone got too drunk and poisoned themselves ")
+                await game.command_cog.send_direct_message(player.player_name,f"Someone got too drunk and poisoned themselves ")
             
             
 @register_encounter(CHOSEN_ONE,[],[CHOSEN_ONE],
