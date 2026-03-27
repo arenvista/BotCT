@@ -43,24 +43,26 @@ class PacifismEncounter(Encounter):
         soldier=game.get_player_by_role(RoleName.SOLDIER)
         
         if soldier is not None:
-            available_roles=RoleName.get_by_class(RoleClass.OUTSIDERS)+RoleName.get_by_class(RoleClass.TOWNSFOLK)[:3] #limit to length 3
+            available_roles=RoleName.get_by_class(RoleClass.TOWNSFOLK)+RoleName.get_by_class(RoleClass.OUTSIDERS)
+
             for player in game.players:
-                if player.actual_role in available_roles:
-                    available_roles.remove(player.actual_role)
+                if player.registered_role in available_roles:
+                    available_roles.remove(player.registered_role)
+
             if len(available_roles)>0:
-                
+                available_roles=available_roles[:3] #limit to 3 
                 new_role_name=await game.command_cog.dmdropdown(soldier.player_name,"What shall this brave veteran's new occupation be?",[r.name for r in available_roles],1)
+                new_role_name=new_role_name[0]
                 #async def dmdropdown(self, user_name: str, message_text: str, dropdown_options: List[str], max_selection: int) -> Optional[List[str]]:
                 for r in available_roles:
                     if r.name==new_role_name:
                         new_role=r
                         break
                 
-                soldier.actual_role=new_role
                 soldier.registered_role=new_role
                 soldier.believed_role=new_role
                 
-                game.command_cog.send_direct_message(soldier.player_name,f"Your new job is {new_role.display_name}")
+                await game.command_cog.send_direct_message(soldier.player_name,f"Your new job is {new_role.display_name}")
                 
 @register_encounter(PARTY,[],[],"Party Time!",
                     "The Townsfolk are throwing a party! Let's get totally sloshed!"
@@ -102,7 +104,6 @@ class ChosenEncounter(Encounter):
             chosen_player=await game.command_cog.dmdropdown(player.player_name,"Who has curried the favor of the gods?",[p.player_name for p in game.players],1)
             chosen_player=chosen_player[0]
             votes[chosen_player]=votes.get(chosen_player,0)+1
-        print(votes)
             
         most_popular_player=game.get_player_by_name(sorted([(v,k )for k,v in votes.items()],key=lambda x:x[0],reverse=True)[0][1])
         most_popular_player.status.protected=True
