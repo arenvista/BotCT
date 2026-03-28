@@ -95,7 +95,7 @@ class RoleName(Enum):
     VIRGIN = (18, RoleClass.TOWNSFOLK)
     SLAYER = (19, RoleClass.TOWNSFOLK)
     SOLDIER = (20, RoleClass.TOWNSFOLK)
-    MAYOR = (21, RoleClass.TOWNSFOLK)
+    #MAYOR = (21, RoleClass.TOWNSFOLK) this is disabled because its hard :-(
 
     # Demons
     IMP = (22, RoleClass.DEMONS)
