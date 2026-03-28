@@ -96,7 +96,16 @@ class LibrarianBehavior(InfoRoleBehavior):
         return {"players": [actual.username, decoy.username], "role": str(actual.registered_role)}
 
     async def get_manual_trusted(self, player: Player, game: GameManager, default_data: Dict[str, Any]) -> Dict[str, Any]:
-        return default_data # Add GM overrides similar to Washerwoman if desired
+        valid_outsiders = get_filtered_players(game, role_names_registered=ROLES_OUTSIDERS, excluded_players=set([player]))
+        if not valid_outsiders: return {"players": ["No Outsiders"], "role": "in play"} # BotC specific rule (0 Outsiders ping)
+        
+        actual = await game.send_query(game.game_master, "Select Outsider", [p.username for p in valid_outsiders], 1)
+        if not actual: return default_data
+        decoy = await game.send_query(game.game_master, "Select Player", [p.username for p in game.get_players() if p.username != actual[0] and p != player], 1)
+        actual_other = decoy[0] if decoy else default_data["players"][1]
+
+        return {"players": [actual[0], actual_other], "role": str(game.get_player(actual[0]).registered_role)}
+
 
     async def get_default_dishonest(self, player: Player, game: GameManager) -> Dict[str, Any]:
         fake_targets = random.sample([p for p in game.get_players() if p != player], 2)
@@ -112,6 +121,97 @@ class LibrarianBehavior(InfoRoleBehavior):
         else:
             random.shuffle(players)
             await game.send_message(player.username, f"One of {players[0]} and {players[1]} is the {night_data.get('role')}.")
+
+@register_role(RoleName.INVESTIGATOR)
+class InvestigatorBehavior(InfoRoleBehavior):
+    first_night_priority = 5
+    async def get_default_trusted(self, player, game):
+        minions = get_filtered_players(game, role_names_believed=ROLES_MINIONS)  
+        others = get_filtered_players(game, excluded_players=set(minions + [player]))
+
+        rand_minion = random.choice(minions)
+        rand_other = random.choice(others)
+
+        return {"player_one": rand_minion.username, "player_two": rand_other.username, "role_to_reveal": rand_minion.believed_role}
+
+    async def get_manual_trusted(self, player, game, default_data):
+        minions = get_filtered_players(game, role_names_believed=ROLES_MINIONS)  
+        others = get_filtered_players(game, excluded_players=set(minions + [player]))    
+
+
+        gm_minion = await game.send_query(game.game_master, "Select a Minion for Investigator", [p.username for p in minions], 1)
+        if not gm_minion: return default_data
+        gm_other = await game.send_query(game.game_master, "Select Non-Minion Player for Investigator", [p.username for p in others], 1)
+        if not gm_other: return default_data
+
+        gm_minion_player = game.get_player(gm_minion[0])
+        gm_other_player = game.get_player(gm_other[0])
+
+        return {"player_one": gm_minion_player.username, "player_two": gm_other_player.username, "role_to_reveal": gm_minion_player.believed_role}
+    
+    async def get_default_dishonest(self, player, game):
+        evil_players = get_filtered_players(game, alignment=Alignment.EVIL)
+        others = random.sample(get_filtered_players(game, excluded_players=set(evil_players + [player])), k=2)
+        rand_other_one = others[0]
+        rand_other_two = others[1]
+
+        return {"player_one": rand_other_one.username, "player_two": rand_other_two.username, "role_to_reveal": random.choice(ROLES_MINIONS).__str__()}
+
+    async def get_manual_dishonest(self, player, game, default_data):
+        evil_players = get_filtered_players(game, alignment=Alignment.EVIL)
+        others = random.sample(get_filtered_players(game, excluded_players=set(evil_players + [player])), k=2)
+        rand_other_one = await game.send_query(game.game_master, "Select Non-Evil Player", [p.username for p in others], 1)
+        if not rand_other_one: return default_data
+
+        rand_other_player_one = game.get_player(rand_other_one[0])
+        others.remove(rand_other_player_one)
+
+        rand_other_two = await game.send_query(game.game_master, "Select Non-Evil Player", [p.username for p in others], 1)
+        if not rand_other_two: return default_data
+        rand_other_player_two = game.get_player(rand_other_two[0])
+
+        random_evil_role = await game.send_query(game.game_master, "Select Evil Role", [str(r) for r in ROLES_MINIONS], 1)
+        if not random_evil_role: return default_data
+
+        return {"player_one": rand_other_player_one.username, "player_two": rand_other_player_two.username, "role_to_reveal": random_evil_role[0]}
+
+    async def send_result(self, player, game, night_data):
+
+        rand_int = random.randint(0, 1)
+        
+        if rand_int == 0:
+            await game.send_message(player.username, f"Either {night_data["player_one"]} or {night_data["player_two"]} is a {night_data["role_to_reveal"]} ", )
+        else:
+            await game.send_message(player.username, f"Either {night_data["player_two"]} or {night_data["player_one"]} is a {night_data["role_to_reveal"]} ", )
+
+@register_role(RoleName.EMPATH)
+class EmpathBehavior(InfoRoleBehavior):
+    first_night_priority = 7
+    other_night_priority = 8
+
+    async def get_default_trusted(self, player, game):
+        left, right = game.get_alive_neighbors(player)
+        evil_count = sum(1 for p in [left, right] if p.registered_alignment == Alignment.EVIL)
+        return {"neighbor_one": left.username, "neighbor_two": right.username, "evil_count": evil_count}
+
+    async def get_manual_trusted(self, player, game, default_data):
+        gm_val = await game.send_query(game.game_master, "Override Empath Evil Count (0-2)", ["0", "1", "2"], 1)
+        if gm_val:
+            default_data["evil_count"] = int(gm_val[0])
+        return default_data
+
+    async def get_default_dishonest(self, player, game):
+        left, right = game.get_alive_neighbors(player)
+        return {"neighbor_one": left.username, "neighbor_two": right.username, "evil_count": random.randint(0, 2)}
+
+    async def get_manual_dishonest(self, player, game, default_data):
+        gm_val = await game.send_query(game.game_master, "Select False Evil Count for Empath", ["0", "1", "2"], 1)
+        if gm_val:
+            default_data["evil_count"] = int(gm_val[0])
+        return default_data
+
+    async def send_result(self, player, game, night_data):
+        await game.send_message(player.username, f"{night_data['evil_count']} of your neighbors ({night_data['neighbor_one']} and {night_data['neighbor_two']}) are evil.")
 
 
 @register_role(RoleName.CHEF)
@@ -129,7 +229,8 @@ class ChefBehavior(InfoRoleBehavior):
         return {"pairs": pairs}
 
     async def get_manual_trusted(self, player: Player, game: GameManager, default_data: Dict[str, Any]) -> Dict[str, Any]:
-        return default_data # Usually GM doesn't override true math, but you can add it
+        gm_val = await game.send_query(game.game_master, "Enter Pair Count (0-2)", ['0', '1', '2'], 1)
+        return {"pairs": int(gm_val[0])}
 
     async def get_default_dishonest(self, player: Player, game: GameManager) -> Dict[str, Any]:
         # Give random number from 0-2 depending on distribution of players
@@ -138,12 +239,15 @@ class ChefBehavior(InfoRoleBehavior):
         return {"pairs": random.randint(0, max_guess)}
 
     async def get_manual_dishonest(self, player: Player, game: GameManager, default_data: Dict[str, Any]) -> Dict[str, Any]:
-        gm_val = await game.send_query(game.game_master, "Enter False Pair Count (0-3)", ["0", "1", "2", "3"], 1)
+        gm_val = await game.send_query(game.game_master, "Enter False Pair Count (0-2)", ["0", "1", "2"], 1)
         if gm_val: default_data["pairs"] = int(gm_val[0])
         return default_data
 
     async def send_result(self, player: Player, game: GameManager, night_data: Dict[str, Any]) -> None:
-        await game.send_message(player.username, f"There are {night_data.get('pairs')} pairs of evil players.")
+        if night_data.get('pairs') == 1:
+            await game.send_message(player.username, f"There is {night_data.get('pairs')} pair of evil.")
+        else:
+            await game.send_message(player.username, f"There is {night_data.get('pairs')} pairs of evil.")
 
 
 @register_role(RoleName.UNDERTAKER)
@@ -153,10 +257,20 @@ class UndertakerBehavior(InfoRoleBehavior):
     async def get_default_trusted(self, player: Player, game: GameManager) -> Dict[str, Any]:
         if not game: return {}
         executed = game.get_player(game.mgr_day.executed_player)
-        return {"role": str(executed.registered_role)} if executed else {"":""}
+        if not executed: return {}
 
+        if executed.registered_role == RoleName.RECLUSE:
+            return {"role": str(executed.believed_role)}
+        return {"role": str(executed.registered_role)}
+
+    # Kinda useless logic here but whatever, if GM wants overright, their wish is my command
     async def get_manual_trusted(self, player: Player, game: GameManager, default_data: Dict[str, Any]) -> Dict[str, Any]:
-        return default_data
+        if not game.mgr_day.executed_player: return {}
+        
+        gm_val = await game.send_query(game.game_master, "Provide the role of the executed player", [p.registered_role.__str__() if p.registered_role != RoleName.RECLUSE else p.believed_role for p in game.mgr_player.player_list], 1)
+        if not gm_val: return default_data
+        return {"role": str(game.get_player(gm_val[0]).registered_role)}
+
 
     async def get_default_dishonest(self, player: Player, game: GameManager) -> Dict[str, Any]:
         if not game.mgr_day.executed_player: return {}
@@ -243,7 +357,7 @@ class FortuneTellerBehavior(RoleBehavior):
         msg = "YES" if has_demon else "NO"
         await game.send_message(player.username, f"Demon presence: {msg}")
 
-
+#TODO: TEST
 @register_role(RoleName.RAVENKEEPER)
 class RavenkeeperBehavior(RoleBehavior):
     other_night_priority = 6
