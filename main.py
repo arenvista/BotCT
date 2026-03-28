@@ -40,5 +40,5 @@ if __name__ == "__main__":
         os.environ["IMMORTAL"]="0"
         
     if len(args.assignment_map)>0:
-        os.environ["ASSIGN"]=args.assignment_map
+        os.environ["MAPPING"]=args.assignment_map
     main()

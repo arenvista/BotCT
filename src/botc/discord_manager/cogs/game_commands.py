@@ -17,6 +17,7 @@ from botc import Player, Alignment
 from botc.enums import RoleName, RoleClass
 from botc.discord_manager.views import JoinLobbyView, DropdownView
 from botc.discord_manager.polling import PollManager
+import json
 
 
 class GameCommands(commands.Cog):
@@ -257,21 +258,13 @@ A new game is forming! Click the button below to join the town.
     @app_commands.default_permissions(manage_roles=True)
     async def start_game(self, interaction: discord.Interaction) -> None:
         num_players: int = len(self.game.mgr_player.player_names)
-        # if num_players < 5:  # Fixed from < 0
-        #     await interaction.response.send_message(f"❌ You need at least 5 to play!", ephemeral=True)
-        #     return
+
             
         await interaction.response.send_message("🔒 **The lobby is closed!** Starting GM Poll...")
         poll: PollManager = PollManager(self.game)
         self.game.game_master = await poll.run_gamemaster_poll(interaction)
 
-        # # Testing End Start
-        # ROLES_DEMONS = RoleName.get_by_class(RoleClass.DEMONS)
-        # ROLES_MINIONS = RoleName.get_by_class(RoleClass.MINIONS)
-        # ROLES_OUTSIDERS = RoleName.get_by_class(RoleClass.OUTSIDERS)
-        # ROLES_TOWNSFOLK = RoleName.get_by_class(RoleClass.TOWNSFOLK)
-        # targets = ROLES_DEMONS + ROLES_MINIONS + ROLES_OUTSIDERS + ROLES_TOWNSFOLK[:-10]
-        # for r in targets:
+
         if "TESTING" in os.environ and os.environ["TESTING"]=="1":
             r = RoleName.KLUTZ
             self.game.mgr_player.player_list.append(Player("iiiii5184", r, r, Alignment.GOOD))
@@ -281,43 +274,20 @@ A new game is forming! Click the button below to join the town.
             self.game.mgr_player.player_list.append(Player("microsina", r, r, Alignment.EVIL))
             r = RoleName.SOLDIER
             self.game.mgr_player.player_list.append(Player("bakerthebread", r, r, Alignment.GOOD))
-        # targets = ROLES_MINIONS + ROLES_OUTSIDERS + ROLES_TOWNSFOLK
-        # counter = 0
-        # for r in targets[0:3]:
-        #     counter += 1
-        #     self.game.mgr_player.player_list.append(Player(f"Test{counter}", r, r, Alignment.GOOD))
-        # Testing End Start
-        ROLES_DEMONS = RoleName.get_by_class(RoleClass.DEMONS)
-        ROLES_MINIONS = RoleName.get_by_class(RoleClass.MINIONS)
-        ROLES_OUTSIDERS = RoleName.get_by_class(RoleClass.OUTSIDERS)
-        ROLES_TOWNSFOLK = RoleName.get_by_class(RoleClass.TOWNSFOLK)
-        targets = ROLES_DEMONS + ROLES_MINIONS + ROLES_OUTSIDERS + ROLES_TOWNSFOLK[:-10]
-
-        # for i, r in enumerate(targets):        
-        # self.game.mgr_player.player_list.append(Player(f"temp1", RoleName.EMPATH, RoleName.EMPATH, Alignment.GOOD))
-        self.game.mgr_player.player_list.append(Player(f"bakerthebread", RoleName.UNDERTAKER, RoleName.UNDERTAKER, Alignment.GOOD))
-        self.game.mgr_player.player_list.append(Player("chudbotc1",RoleName.IMP, RoleName.IMP, Alignment.EVIL))
-        self.game.mgr_player.player_list.append(Player(f"temp2", RoleName.IMP, RoleName.IMP, Alignment.EVIL))
-        # self.game.mgr_player.player_list.append(Player(f"temp1", RoleName.IMP, RoleName.IMP, Alignment.EVIL))
-        self.game.mgr_player.player_list.append(Player(f"temp3", RoleName.SCARLET_WOMAN, RoleName.SCARLET_WOMAN, Alignment.EVIL))
-        self.game.mgr_player.player_list.append(Player(f"temp5", RoleName.VIRGIN, RoleName.VIRGIN, Alignment.GOOD))
-        self.game.mgr_player.player_list.append(Player(f"temp6", RoleName.DRUNK, RoleName.DRUNK, Alignment.GOOD))
-        self.game.mgr_player.player_list.append(Player(f"temp7", RoleName.SOLDIER, RoleName.SOLDIER, Alignment.GOOD))
-        self.game.mgr_player.player_list.append(Player(f"temp8", RoleName.MAYOR, RoleName.MAYOR, Alignment.GOOD))
-        
+        if "MAPPING" in os.environ:
+            print("mapped")
+            with open(os.environ["MAPPING"],"r") as file:
+                mapping=json.load(file)
+                print(mapping)
+                evil_classes= RoleName.get_by_class(RoleClass.DEMONS)+RoleName.get_by_class(RoleClass.MINIONS)
+                for name,num in mapping.items():
+                    if RoleName(num) in evil_classes:
+                        align=Alignment.EVIL
+                    else:
+                        align=Alignment.GOOD
+                    self.game.mgr_player.player_list.append(Player(name,RoleName(num),RoleName(num),align))
 
 
-
-
-        # Fixed: Append directly to the actual state, not a filtered copy
-        # for i, r in enumerate(targets): 
-        #     self.game.mgr_player.player_list.append(Player(f"pain{i}", r, r, Alignment.GOOD))
-
-        # targets = ROLES_MINIONS + ROLES_OUTSIDERS + ROLES_TOWNSFOLK
-        
-        # for i, r in enumerate(targets[0:3]):
-        #     self.game.mgr_player.player_list.append(Player(f"suffering{i}", r, r, Alignment.GOOD))
-        # Testing End
 
         await self.game.start_game(interaction)
 
