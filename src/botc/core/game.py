@@ -17,16 +17,17 @@ from botc.discord_manager.cogs.game_commands import GameCommands
 from dataclasses import dataclass
 
 
-class EventManager:
-    def __init__(self):
+class EncounterManager:
+    def __init__(self,game:'GameManager',deck_path:str="default"):
         self.event_interval = 1  # how frequently to do an event, hardcoded for now
-        self.event_deck = Deck.from_json("default")
+        self.game=game
+        self.event_deck = Deck.from_json(deck_path)
 
-    # def CallEvent(self, game: 'GameManager'):
-    #     if self.event_deck:
-    #         card = self.event_deck.draw_card()
-    #         await interaction.channel.send(card.specific_encounter.flavor_text) 
-    #         await card.specific_encounter.resolve(self)
+    async def draw_card(self,interaction:discord.Interaction):
+        if self.event_deck:
+            card = self.event_deck.draw_card()
+            await interaction.channel.send(card.specific_encounter.flavor_text) 
+            await card.specific_encounter.resolve(self.game,interaction)
 
 @dataclass
 class Counters:
@@ -138,6 +139,7 @@ class GameManager:
         self.mgr_day: DayManager = DayManager(self)
         self.killed_tonight: Player|None = None
         self.mgr_discord: DiscordManager = DiscordManager(self)
+        self.mgr_encounter: EncounterManager=EncounterManager(self)
 
     def get_player(self, username) -> Player | None:
         return self.mgr_player.get_player(username)
@@ -167,6 +169,9 @@ class GameManager:
         self.counter.day += 1
         self.resolve_temporary_conditions()
         await self.mgr_day.start_voting_phase(interaction)
+        
+    async def encounter_resolve(self,interaction:discord.Interaction):
+        await self.mgr_encounter.draw_card(interaction)
 
     async def night_events(self):
         if self.counter.night == 1:
@@ -183,6 +188,7 @@ class GameManager:
         # self.mgr_player.assign_roles()
         await self.message_roles_to_players()
         await self.night_events()
+        await self.encounter_resolve(interaction)
         await self.day_events(interaction)
 
 

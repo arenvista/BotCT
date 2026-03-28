@@ -31,6 +31,7 @@ class OneShotEncounter(Encounter):
 @register_encounter(FLAVOR_TEXT_EVENT_ENUM,[],[],"Flavor","A crazy ecnounter just happened wow!!!")
 class FlavorTextEncounter(Encounter):
     async def resolve(self, game,interaction: discord.Interaction):
+        interaction.channel.send("WOWOWOWOWOWO")
         pass
     
 @register_encounter(PACIFISM,[],[PACIFISM],"Pacifism",
