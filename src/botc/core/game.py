@@ -171,6 +171,13 @@ class GameManager:
     async def night_events(self):
         if self.counter.night == 0:
             #Start of 1st Night
+            demon_players=[p.username for p in self.get_players() if p.registered_role.role_class == RoleClass.DEMONS]
+            demon_str=" , ".join(demon_players)
+            minion_players=[p.username for p in self.get_players() if p.registered_role.role_class == RoleClass.MINIONS]
+            minion_str=" , ".join(minion_players)
+            message=f"the demon players are {demon_str} and the minion players are {minion_str}"
+            for player in demon_players+minion_players:
+                await self.send_message(player, message)
             for player in self.mgr_night.get_wake_order(True):
                 print("Calling " + player.registered_role.display_name)
                 await player.take_action(self)
