@@ -18,26 +18,28 @@ class PoisonerBehavior(RoleBehavior):
     other_night_priority = 1
 
     async def act(self, player: Player, game: GameManager) -> None:
-        user_sel = await game.command_cog.dmpoll(
-            player.player_name,
-            "Who do you want to poison?", # Typo fixed
-            [p.player_name for p in game.players_alive],
+        # 1. Get the list of alive Player objects
+        alive_players = game.get_players({"alive": True})
+        
+        # 2. Extract just their usernames (strings)
+        target_names = [p.username for p in alive_players]
+
+        user_sel = await game.send_query(
+            player.username,
+            "Who do you want to poison?", 
+            target_names,  # <--- MUST be the strings!
             1,
         )
         
-        # Gracefully handle timeouts instead of crashing the game loop
         if user_sel is None:
-            print(f"{player.player_name} (Poisoner) timed out or failed to make a selection.")
+            print(f"{player.username} (Poisoner) timed out or failed to make a selection.")
             return
             
         target_name: str = user_sel[0]
-        target = game.get_player_by_name(target_name)
-        target.status.poisoned = True
+        target = game.get_player(target_name)
+        if target: target.status.poisoned = True
         print(f"Put {player.believed_role} to sleep.")
-        await game.command_cog.send_direct_message(
-            player.player_name, game.get_board_str()
-        )
-
+        await game.send_message(player.username, game.get_board_str())
 
 @register_role(RoleName.SPY)
 class SpyBehavior(RoleBehavior):
@@ -45,9 +47,7 @@ class SpyBehavior(RoleBehavior):
     other_night_priority = 3
 
     async def act(self, player: Player, game: GameManager) -> None:
-        await game.command_cog.send_direct_message(
-            player.player_name, game.get_board_str()
-        )
+        await game.send_message( player.username, game.get_board_str())
 
 
 @register_role(RoleName.SCARLET_WOMAN)
@@ -55,15 +55,13 @@ class ScarletWomanBehavior(RoleBehavior):
     other_night_priority = 4
 
     async def act(self, player: Player, game: GameManager) -> None:
-        imp = game.get_player_by_role(RoleName.IMP)
-        alive_players = sum(1 for p in game.players if p.status.alive)
+        imp = game.get_players(filter_roles=[RoleName.IMP])[0]
+        alive_players = sum(1 for p in game.get_players({"alive":True}))
 
         if imp and not imp.status.alive and alive_players >= 5:
-            prompt = f"\n*** The Imp is dead. The {player.believed_role} ({player.player_name}) is now the Imp! ***"
+            prompt = f"\n*** The Imp is dead. The {player.believed_role} ({player.username}) is now the Imp! ***"
             player.registered_role = RoleName.IMP
             player.believed_role = RoleName.IMP
             player.registered_alignment = Alignment.EVIL
             player.role_behavior = BEHAVIOR_MAP[RoleName.IMP]
-            
-            # NOTE: You might want to actually send this prompt to the player!
-            # await game.command_cog.send_direct_message(player.player_name, prompt)
+            await game.send_message(player.username, prompt)

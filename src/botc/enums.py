@@ -10,10 +10,15 @@ class Status:
     protected: bool = False
     alive: bool = True
     red_herring: bool = False
+    vote_chips: int = 1
 
     @property
     def is_reliable(self) -> bool:
         return not self.poisoned and not self.drunk
+
+    @property
+    def can_vote(self) -> bool:
+        return True if self.alive or self.vote_chips >= 1 else False
 
     @property
     def is_protected(self) -> bool:
@@ -25,6 +30,11 @@ class Status:
             setattr(self, attr_name, not getattr(self, attr_name))
         else:
             raise ValueError(f"Status '{attr_name}' does not exist.")
+
+    def resolve_temporary_conditions(self):
+        self.protected=False
+        self.poisoned=False
+
 
 class Alignment(Enum):
     GOOD = 1

@@ -28,7 +28,7 @@ def get_filtered_players(
     excluded_players: Optional[Set[Player]] = None 
 ) -> List[Player]:
     
-    player_list: List[Player] = game.players
+    player_list: List[Player] = game.get_players()
     if alignment is not None: player_list = [p for p in player_list if p.registered_alignment == alignment]
     if is_poisoned is not None: player_list = [p for p in player_list if p.status.poisoned == is_poisoned]
     if is_drunk is not None: player_list = [p for p in player_list if p.status.drunk == is_drunk]
@@ -49,30 +49,30 @@ class WasherwomanBehavior(InfoRoleBehavior):
     first_night_priority = 3
 
     async def get_default_trusted(self, player: Player, game: GameManager) -> Dict[str, Any]:
-        valid_townsfolk = [p for p in game.players if p.registered_role.role_class == RoleClass.TOWNSFOLK and p != player]
+        valid_townsfolk = [p for p in game.get_players() if p.registered_role.role_class == RoleClass.TOWNSFOLK and p != player]
         if not valid_townsfolk: return {}
         actual = random.choice(valid_townsfolk)
-        decoy = random.choice([p for p in game.players if p != actual and p != player])
-        return {"players": [actual.player_name, decoy.player_name], "role": str(actual.registered_role)}
+        decoy = random.choice([p for p in game.get_players() if p != actual and p != player])
+        return {"players": [actual.username, decoy.username], "role": str(actual.registered_role)}
 
     async def get_manual_trusted(self, player: Player, game: GameManager, default_data: Dict[str, Any]) -> Dict[str, Any]:
-        valid_townsfolk = [p for p in game.players if p.registered_role.role_class == RoleClass.TOWNSFOLK and p != player]
-        gm_town = await game.modify_information("Select a Townsfolk", [p.player_name for p in valid_townsfolk], 1)
+        valid_townsfolk = [p for p in game.get_players() if p.registered_role.role_class == RoleClass.TOWNSFOLK and p != player]
+        gm_town = await game.send_query(game.game_master, "Select a Townsfolk", [p.username for p in valid_townsfolk], 1)
         if not gm_town: return default_data
         
-        gm_decoy = await game.modify_information("Select a Decoy", [p.player_name for p in game.players if p.player_name != gm_town[0] and p != player], 1)
+        gm_decoy = await game.send_query(game.game_master, "Select a Decoy", [p.username for p in game.get_players() if p.username != gm_town[0] and p != player], 1)
         actual_other = gm_decoy[0] if gm_decoy else default_data["players"][1]
         
-        return {"players": [gm_town[0], actual_other], "role": str(game.get_player_by_name(gm_town[0]).registered_role)}
+        return {"players": [gm_town[0], actual_other], "role": str(game.get_player(gm_town[0]).registered_role)}
 
     async def get_default_dishonest(self, player: Player, game: GameManager) -> Dict[str, Any]:
-        fake_targets = random.sample([p for p in game.players if p != player], 2)
-        return {"players": [p.player_name for p in fake_targets], "role": str(random.choice(ROLES_TOWNSFOLK))}
+        fake_targets = random.sample([p for p in game.get_players() if p != player], 2)
+        return {"players": [p.username for p in fake_targets], "role": str(random.choice(ROLES_TOWNSFOLK))}
 
     async def get_manual_dishonest(self, player: Player, game: GameManager, default_data: Dict[str, Any]) -> Dict[str, Any]:
-        gm_players = await game.modify_information("Select 2 Fake Targets", [p.player_name for p in game.players if p != player], 2)
+        gm_players = await game.send_query(game.game_master, "Select 2 Fake Targets", [p.username for p in game.get_players() if p != player], 2)
         if gm_players and len(gm_players) == 2: default_data["players"] = gm_players
-        gm_role = await game.modify_information("Select Fake Role", [str(r) for r in ROLES_TOWNSFOLK], 1)
+        gm_role = await game.send_query(game.game_master, "Select Fake Role", [str(r) for r in ROLES_TOWNSFOLK], 1)
         if gm_role: default_data["role"] = gm_role[0]
         return default_data
 
@@ -81,7 +81,7 @@ class WasherwomanBehavior(InfoRoleBehavior):
         if len(players) == 2:
             random.shuffle(players)
             msg = f"One of {players[0]} and {players[1]} is the {night_data.get('role')}."
-            await game.command_cog.send_direct_message(player.player_name, msg)
+            await game.send_message(player.username, msg)
 
 
 @register_role(RoleName.LIBRARIAN)
@@ -89,18 +89,18 @@ class LibrarianBehavior(InfoRoleBehavior):
     first_night_priority = 4
     # (Implementation mirrors Washerwoman, checking ROLES_OUTSIDERS instead of TOWNSFOLK)
     async def get_default_trusted(self, player: Player, game: GameManager) -> Dict[str, Any]:
-        valid_outsiders = [p for p in game.players if p.registered_role.role_class == RoleClass.OUTSIDERS and p != player]
+        valid_outsiders = [p for p in game.get_players() if p.registered_role.role_class == RoleClass.OUTSIDERS and p != player]
         if not valid_outsiders: return {"players": ["No Outsiders"], "role": "in play"} # BotC specific rule (0 Outsiders ping)
         actual = random.choice(valid_outsiders)
-        decoy = random.choice([p for p in game.players if p != actual and p != player])
-        return {"players": [actual.player_name, decoy.player_name], "role": str(actual.registered_role)}
+        decoy = random.choice([p for p in game.get_players() if p != actual and p != player])
+        return {"players": [actual.username, decoy.username], "role": str(actual.registered_role)}
 
     async def get_manual_trusted(self, player: Player, game: GameManager, default_data: Dict[str, Any]) -> Dict[str, Any]:
         return default_data # Add GM overrides similar to Washerwoman if desired
 
     async def get_default_dishonest(self, player: Player, game: GameManager) -> Dict[str, Any]:
-        fake_targets = random.sample([p for p in game.players if p != player], 2)
-        return {"players": [p.player_name for p in fake_targets], "role": str(random.choice(ROLES_OUTSIDERS))}
+        fake_targets = random.sample([p for p in game.get_players() if p != player], 2)
+        return {"players": [p.username for p in fake_targets], "role": str(random.choice(ROLES_OUTSIDERS))}
 
     async def get_manual_dishonest(self, player: Player, game: GameManager, default_data: Dict[str, Any]) -> Dict[str, Any]:
         return default_data
@@ -108,10 +108,10 @@ class LibrarianBehavior(InfoRoleBehavior):
     async def send_result(self, player: Player, game: GameManager, night_data: Dict[str, Any]) -> None:
         players = night_data.get("players", [])
         if len(players) == 1:
-            await game.command_cog.send_direct_message(player.player_name, "There are no Outsiders in play.")
+            await game.send_message(player.username, "There are no Outsiders in play.")
         else:
             random.shuffle(players)
-            await game.command_cog.send_direct_message(player.player_name, f"One of {players[0]} and {players[1]} is the {night_data.get('role')}.")
+            await game.send_message(player.username, f"One of {players[0]} and {players[1]} is the {night_data.get('role')}.")
 
 
 @register_role(RoleName.CHEF)
@@ -120,11 +120,11 @@ class ChefBehavior(InfoRoleBehavior):
 
     async def get_default_trusted(self, player: Player, game: GameManager) -> Dict[str, Any]:
         pairs = 0
-        n = len(game.players)
+        n = len(game.get_players())
         for i in range(n):
-            if game.players[i].registered_alignment == Alignment.EVIL:
+            if game.get_players()[i].registered_alignment == Alignment.EVIL:
                 next_index = (i + 1) % n
-                if game.players[next_index].registered_alignment == Alignment.EVIL:
+                if game.get_players()[next_index].registered_alignment == Alignment.EVIL:
                     pairs += 1
         return {"pairs": pairs}
 
@@ -133,17 +133,17 @@ class ChefBehavior(InfoRoleBehavior):
 
     async def get_default_dishonest(self, player: Player, game: GameManager) -> Dict[str, Any]:
         # Give random number from 0-2 depending on distribution of players
-        num_evil = sum(1 for p in game.players if p.registered_alignment == Alignment.EVIL)
+        num_evil = sum(1 for p in game.get_players() if p.registered_alignment == Alignment.EVIL)
         max_guess = min(num_evil, 2)
         return {"pairs": random.randint(0, max_guess)}
 
     async def get_manual_dishonest(self, player: Player, game: GameManager, default_data: Dict[str, Any]) -> Dict[str, Any]:
-        gm_val = await game.modify_information("Enter False Pair Count (0-3)", ["0", "1", "2", "3"], 1)
+        gm_val = await game.send_query(game.game_master, "Enter False Pair Count (0-3)", ["0", "1", "2", "3"], 1)
         if gm_val: default_data["pairs"] = int(gm_val[0])
         return default_data
 
     async def send_result(self, player: Player, game: GameManager, night_data: Dict[str, Any]) -> None:
-        await game.command_cog.send_direct_message(player.player_name, f"There are {night_data.get('pairs')} pairs of evil players.")
+        await game.send_message(player.username, f"There are {night_data.get('pairs')} pairs of evil players.")
 
 
 @register_role(RoleName.UNDERTAKER)
@@ -151,30 +151,31 @@ class UndertakerBehavior(InfoRoleBehavior):
     other_night_priority = 7
 
     async def get_default_trusted(self, player: Player, game: GameManager) -> Dict[str, Any]:
-        if not game.executed_player: return {}
-        executed = game.get_player_by_name(game.executed_player)
-        return {"role": str(executed.registered_role)}
+        if not game: return {}
+        executed = game.get_player(game.mgr_day.executed_player)
+        return {"role": str(executed.registered_role)} if executed else {"":""}
 
     async def get_manual_trusted(self, player: Player, game: GameManager, default_data: Dict[str, Any]) -> Dict[str, Any]:
         return default_data
 
     async def get_default_dishonest(self, player: Player, game: GameManager) -> Dict[str, Any]:
-        if not game.executed_player: return {}
+        if not game.mgr_day.executed_player: return {}
         # Pick a completely random role that isn't what they actually are
-        executed = game.get_player_by_name(game.executed_player)
-        fake_roles = [r for r in RoleName if r != executed.registered_role]
+        executed = game.get_player(game.mgr_day.executed_player)
+        if executed: fake_roles = [r for r in RoleName if r != executed.registered_role]
+        else: fake_roles = [""]
         return {"role": str(random.choice(fake_roles))}
 
     async def get_manual_dishonest(self, player: Player, game: GameManager, default_data: Dict[str, Any]) -> Dict[str, Any]:
-        if not game.executed_player: return {}
-        gm_val = await game.modify_information("Provide false role for executed player", [str(r) for r in RoleName], 1)
+        if not game.mgr_day.executed_player: return {}
+        gm_val = await game.send_query(game.game_master, "Provide false role for executed player", [str(r) for r in RoleName], 1)
         if gm_val: default_data["role"] = gm_val[0]
         return default_data
 
     async def send_result(self, player: Player, game: GameManager, night_data: Dict[str, Any]) -> None:
         if "role" in night_data:
             msg = f"The player executed today was the {night_data['role']}."
-            await game.command_cog.send_direct_message(player.player_name, msg)
+            await game.send_message(player.username, msg)
 
 
 # ==========================================
@@ -188,22 +189,22 @@ class MonkBehavior(ActionRoleBehavior):
     async def get_default_target(self, player: Player, game: GameManager) -> Optional[Player]:
         # Prompt the PLAYER for their target
         target_list = get_filtered_players(game, excluded_players={player}, is_alive=True)
-        user_sel = await game.command_cog.dmdropdown(player.player_name, "Who do you protect?", [p.player_name for p in target_list], 1)
+        user_sel = await game.send_query(player.username, "Who do you protect?", [p.username for p in target_list], 1)
         if user_sel:
-            return game.get_player_by_name(user_sel[0])
+            return game.get_player(user_sel[0])
         return None
 
     async def get_manual_target(self, player: Player, game: GameManager) -> Optional[Player]:
         # If the GM wants to force a target for the Monk
         target_list = get_filtered_players(game, excluded_players={player}, is_alive=True)
-        gm_sel = await game.command_cog.dmdropdown(game.game_master, f"Force target for Monk ({player.player_name})", [p.player_name for p in target_list], 1)
+        gm_sel = await game.send_query(game.game_master, f"Force target for Monk ({player.username})", [p.username for p in target_list], 1)
         if gm_sel:
-            return game.get_player_by_name(gm_sel[0])
+            return game.get_player(gm_sel[0])
         return None
 
     async def execute_action(self, player: Player, target: Player, game: GameManager) -> None:
         target.status.protected = True
-        print(f"{target.player_name} protected by Monk.")
+        print(f"{target.username} protected by Monk.")
 
 
 # ==========================================
@@ -217,46 +218,48 @@ class FortuneTellerBehavior(RoleBehavior):
     
     async def act(self, player: Player, game: GameManager) -> None:
         # Custom logic because FT actively queries multiple targets during the night
-        possible_selections = [p for p in game.players if p.status.alive and p != player]
+        possible_selections = [p for p in game.get_players() if p.status.alive and p != player]
         
-        sel_1 = await game.command_cog.dmdropdown(player.player_name, "Select First Player to Divine", [p.player_name for p in possible_selections], 1)
-        sel_2 = await game.command_cog.dmdropdown(player.player_name, "Select Second Player to Divine", [p.player_name for p in possible_selections], 1)
+        sel_1 = await game.send_query(player.username, "Select First Player to Divine", [p.username for p in possible_selections], 1)
+        sel_2 = await game.send_query(player.username, "Select Second Player to Divine", [p.username for p in possible_selections], 1)
         
         if not sel_1 or not sel_2: return
         
-        target_1 = game.get_player_by_name(sel_1[0])
-        target_2 = game.get_player_by_name(sel_2[0])
+        target_1 = game.get_player(sel_1[0])
+        target_2 = game.get_player(sel_2[0])
         
         is_reliable = player.status.is_reliable
         has_demon = False
 
         if is_reliable:
             # Check for Demon OR Red Herring
-            if target_1.registered_role in ROLES_DEMONS or target_2.registered_role in ROLES_DEMONS: has_demon = True
-            if target_1.status.red_herring or target_2.status.red_herring: has_demon = True
+            if target_1 is not None and target_2 is not None:
+                if target_1.registered_role in ROLES_DEMONS or target_2.registered_role in ROLES_DEMONS: has_demon = True
+                if target_1.status.red_herring or target_2.status.red_herring: has_demon = True
         else:
             # Drunk/Poisoned: Random yes/no
             has_demon = random.choice([True, False])
 
         msg = "YES" if has_demon else "NO"
-        await game.command_cog.send_direct_message(player.player_name, f"Demon presence: {msg}")
+        await game.send_message(player.username, f"Demon presence: {msg}")
 
 
 @register_role(RoleName.RAVENKEEPER)
 class RavenkeeperBehavior(RoleBehavior):
     other_night_priority = 6
     async def act(self, player: Player, game: GameManager) -> None:
-        if game.killed_tonight == player.player_name:
+        if game.killed_tonight == player.username:
             target_list = get_filtered_players(game, excluded_players={player})
-            sel = await game.command_cog.dmdropdown(player.player_name, "You died! Select a player to view their role:", [p.player_name for p in target_list], 1)
+            sel = await game.send_query(player.username, "You died! Select a player to view their role:", [p.username for p in target_list], 1)
             
             if sel:
-                target = game.get_player_by_name(sel[0])
+                target = game.get_player(sel[0])
+                if target is None: return 
                 if player.status.is_reliable:
-                    await game.command_cog.send_direct_message(player.player_name, f"{target.player_name} is the {target.registered_role}.")
+                    await game.send_message(player.username, f"{target.username} is the {target.registered_role}.")
                 else:
                     fake_role = random.choice([r for r in RoleName if r != target.registered_role])
-                    await game.command_cog.send_direct_message(player.player_name, f"{target.player_name} is the {fake_role}.")
+                    await game.send_message(player.username, f"{target.username} is the {fake_role}.")
 
 
 # ==========================================

@@ -10,9 +10,8 @@ from botc.core import GameManager
 from time import sleep
 
 def main():
-    game = GameManager([])
-    game.bot.run(game.token)
-    print("done")
+    game = GameManager()
+    game.mgr_discord.run_bot()
     while input() != "z":
         sleep(10)
 

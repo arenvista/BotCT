@@ -12,15 +12,15 @@ class ExecutionDropdown(discord.ui.Select):
         # Add all alive players as options
         for player in alive_players:
             options.append(discord.SelectOption(
-                label=player.player_name, 
+                label=player.username, 
                 description="Vote to execute this player", 
-                emoji="💀"
+                emoji="🖊️"
             ))
         # Add the skip option
         options.append(discord.SelectOption(
             label="Skip Vote", 
             description="Abstain from voting today", 
-            emoji="⏭️"
+            emoji="🕊️"
         ))
         
         super().__init__(placeholder="Select a player to execute...", min_values=1, max_values=1, options=options)
@@ -37,7 +37,7 @@ class ExecutionDropdown(discord.ui.Select):
         
         # Send an ephemeral confirmation that only they can see
         await interaction.response.send_message(
-            f"✅ Your vote for **{chosen_target}** has been recorded. You can change your selection until the poll closes.", 
+            f"🖊️ Your vote for **{chosen_target}** has been recorded. You can change your selection until the poll closes.", 
             ephemeral=True
         )
 
@@ -56,14 +56,14 @@ class JoinLobbyView(discord.ui.View):
     async def join_button(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
         user_name: str = str(interaction.user.name)
         
-        if user_name not in self.game.player_names:
-            self.game.player_names.append(user_name)
+        if user_name not in self.game.mgr_player.player_names:
+            self.game.mgr_player.player_names.append(user_name)
             await interaction.response.send_message(
-                f"✅ You've joined the game! We now have {len(self.game.player_names)} players.", 
+                f"✅ You've joined the game! We now have {len(self.game.mgr_player.player_names)} players.", 
                 ephemeral=True
             )
         else:
-            await interaction.response.send_message(f"Players: " + ",".join(self.game.player_names), ephemeral=True)
+            await interaction.response.send_message(f"Players: " + ",".join(self.game.mgr_player.player_names), ephemeral=True)
             await interaction.response.send_message("⚠️ You are already in the game!", ephemeral=True)
 
 class DropdownView(discord.ui.View):

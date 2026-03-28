@@ -21,7 +21,7 @@ class ButlerBehavior(RoleBehavior):
     other_night_priority = 10
 
     async def act(self, player: Player, game: GameManager):
-        master = random.sample(game.players, 1)[0]
-        await game.command_cog.send_direct_message(
-            player.player_name, f"Worship your lord, {master.player_name}"
+        master = random.sample(game.get_players(), 1)[0]
+        await game.send_message(
+            player.username, f"Worship your lord, {master.username}"
         )

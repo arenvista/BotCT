@@ -10,17 +10,16 @@ if TYPE_CHECKING:
     from botc.behaviors.base import RoleBehavior
 
 class Player: 
-    def __init__(self, player_name: str, believed_role: RoleName, registered_role: RoleName, registered_alignment: Alignment):
-        self.player_name: str = player_name
+    def __init__(self, username: str, believed_role: RoleName, registered_role: RoleName, registered_alignment: Alignment):
+        self.username: str = username
         self.believed_role: RoleName = believed_role
         self.registered_role: RoleName = registered_role
         self.registered_alignment: Alignment = registered_alignment if registered_alignment else self._default_alignment()
         self.status: Status = Status()
         self.role_behavior: RoleBehavior = BEHAVIOR_MAP.get(self.believed_role, PassiveBehavior())
-        self.vote_token: int = 1
 
     def show_role(self):
-        output = f"""Hi {self.player_name}, you are the {self.believed_role}"""
+        output = f"""Hi {self.username}, you are the {self.believed_role}"""
         return output
 
     def _default_alignment(self) -> Alignment:

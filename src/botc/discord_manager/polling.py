@@ -19,53 +19,64 @@ class PollManager:
     async def run_gamemaster_poll(self, interaction: discord.Interaction) -> str:
         """
         Conducts a poll asking who wants to be GM. 
+        Ends automatically when 3 unique users vote, or after 120 seconds.
         Randomly selects one person who said 'Yes'.
         """
         # 1. Create the Poll
-        # NOTE: Answers are passed as a list of PollAnswer objects or dicts
         poll = discord.Poll(
             question="Would you like to be the Game Master?",
-            duration=datetime.timedelta(hours=1), # Discord prefers hour increments; 1 is the minimum for some versions
+            duration=datetime.timedelta(hours=1), # Minimum native duration
         )
         
-        # Correct way to add answers in newer discord.py versions:
         poll.add_answer(text="Yes", emoji="✅")
         poll.add_answer(text="No", emoji="❌")
 
         try:
-            # Use followup.send(poll=poll)
             poll_message = await interaction.followup.send(
-                content="📊 **GM Selection:** Please vote 'Yes' if you are interested in being the Game Master.",
+                content="👑 **GM Selection:** Please vote 'Yes' if you are interested in being the Game Master.",
                 poll=poll
             )
         except discord.HTTPException as e:
-            print(f"Failed to send poll: {e.text}") # .text gives more detail on the 'Invalid Form Body'
+            print(f"Failed to send poll: {e.text}")
             return ""
 
-        # 2. Wait for the poll to finish 
-        # For testing, we wait 120s, then manually end it because minimum duration is usually higher
-        await asyncio.sleep(120)
+        # 2. Wait for 3 unique users to vote, or timeout
+        voted_users = set()
+
+        def check(payload):
+            # Ensure we are only tracking votes on THIS specific poll message
+            if payload.message_id == poll_message.id:
+                voted_users.add(payload.user_id)
+            
+            # Return True to break the 'wait_for' loop when we hit our max
+            return len(voted_users) >= len(self.game.mgr_player.player_names)
+
+        try:
+            # interaction.client safely accesses your bot's event loop
+            await interaction.client.wait_for('raw_poll_vote_add', check=check, timeout=120.0)
+        except asyncio.TimeoutError:
+            # If 120s pass and we don't hit 3 voters, we just move on and finalize anyway
+            pass
 
         # 3. Finalize and fetch results
         try:
-            # Refresh the message to get the latest poll state
+            # Refresh to get the latest state
             poll_message = await interaction.channel.fetch_message(poll_message.id)
             
             if not poll_message.poll.is_finalised:
-                await poll_message.end_poll()
-                # Re-fetch after ending to get final counts
-                poll_message = await interaction.channel.fetch_message(poll_message.id)
+                # OPTIMIZATION: end_poll() actually returns the updated Message object,
+                # saving you from needing an extra fetch_message call afterward!
+                poll_message = await poll_message.end_poll()
+                
         except discord.HTTPException:
             return ""
 
         # 4. Identify the "Yes" voters
         yes_voters = []
         
-        # Find the specific answer for "Yes"
         yes_answer = discord.utils.get(poll_message.poll.answers, text="Yes")
 
         if yes_answer:
-            # Fetch the users who voted for this specific answer
             async for user in yes_answer.voters():
                 if not user.bot:
                     yes_voters.append(user.display_name)
@@ -76,83 +87,102 @@ class PollManager:
             await interaction.followup.send(f"👑 **{selected_gm}** has been randomly selected as the Game Master!")
             return selected_gm
         
-        await interaction.followup.send("⚠️ No one volunteered to be the Game Master.")
+        await interaction.followup.send("🪹 No one volunteered to be the Game Master.")
         return ""
 
+    # Assuming this is inside your class
     async def run_execution_poll(self, interaction: discord.Interaction, allowed_player_ids: list[str]) -> Optional[discord.Message]:
+        # 1. Validate Channel
+        print("Enter")
         if not isinstance(interaction.channel, discord.TextChannel):
             error_msg = "This action requires a text channel."
-            await interaction.followup.send(error_msg, ephemeral=True) if interaction.response.is_done() else await interaction.response.send_message(error_msg, ephemeral=True)
+            if interaction.response.is_done():
+                await interaction.followup.send(error_msg, ephemeral=True)
+            else:
+                await interaction.response.send_message(error_msg, ephemeral=True)
             return None
 
-        await interaction.followup.send(f"Polling Day {self.game.day_counter}", ephemeral=True) if interaction.response.is_done() else await interaction.response.send_message(f"Polling Day {self.game.day_counter}", ephemeral=True)
+        # 2. Acknowledge the Command
+        day_msg = f"Polling Day {self.game.counter.day}"
+        print("Acknowledgeing")
+        if interaction.response.is_done():
+            await interaction.followup.send(day_msg, ephemeral=True)
+        else:
+            await interaction.response.send_message(day_msg, ephemeral=True)
 
+        # 3. Setup the Thread and View
+        print("Setting up thread")
         thread: discord.Thread = await interaction.channel.create_thread(
-            name=f"Town Square Voting: (Day {self.game.day_counter})", type=discord.ChannelType.public_thread
+            name=f"Town Square Voting: (Day {self.game.counter.day}) 🏛️", 
+            type=discord.ChannelType.public_thread
         )
 
-        # 1. Create the Dropdown View
-        view = ExecutionView(self.game.players_alive)
+        alive_players = self.game.get_players(filter_status={"alive": True})
+        print("Got players", alive_players)
+        view = ExecutionView(alive_players)
+        print("Made view")
 
         embed = discord.Embed(
-            title=f"Day {self.game.day_counter}: Who should be executed?",
+            title=f"Who should be executed? 🏛️",
             description="Select a player from the dropdown menu below to cast your vote.\n*You may change your vote at any time before the timer runs out.*", 
             color=discord.Color.dark_red()
         )
 
-        # 2. Send the message with the dropdown attached
+        print("Sending Thred")
         poll_message: discord.Message = await thread.send(embed=embed, view=view)
+        print("Send Poll A")
 
-        duration_minutes: int = 4
+        # 4. Wait Loop (Polling approach)
+        duration_minutes: int = 5
         num_players: int = len(allowed_player_ids)
-        elapsed_time: int = 0
-        check_interval: int = 5
-
-        # 3. Wait Loop
-        while elapsed_time < (duration_minutes * 60):
-            await asyncio.sleep(check_interval)
-            elapsed_time += check_interval
-            
-            # Check if all allowed players have voted
-            # view.dropdown.votes tracks {username: chosen_target}
+        print("Wating A")
+        
+        # We convert duration to seconds. Range with step 5 acts as our check_interval.
+        for _ in range(0, duration_minutes * 5, 5):
+            # view.dropdown.votes tracks {user_identifier: chosen_target}
             voters = [u for u in view.dropdown.votes.keys() if u in allowed_player_ids]
+            print("Inner A")
             if len(voters) >= num_players:
+                print("Inner B")
                 break
+            await asyncio.sleep(5)
 
-        # 4. Disable the dropdown so no more votes can be cast
+        print("Locking")
+        # 5. Lock the Poll
         view.dropdown.disabled = True
         await poll_message.edit(view=view)
 
-        # 5. Tally the Votes
+        # 6. Tally the Votes
         results = {"Skip Vote": 0}
-        for player in self.game.players_alive:
-            results[player.player_name] = 0
+        for player in alive_players:
+            results[player.username] = 0
             
         total_valid_votes = 0
         
-        for voter_name, chosen_target in view.dropdown.votes.items():
-            # Rule: Only alive players count
-            if voter_name in allowed_player_ids:
-                if chosen_target in results:
-                    results[chosen_target] += 1
-                    total_valid_votes += 1
+        for voter_id, chosen_target in view.dropdown.votes.items():
+            if voter_id in allowed_player_ids and chosen_target in results:
+                results[chosen_target] += 1
+                total_valid_votes += 1
 
-        # 6. Process the Results
+        # 7. Process the Results
         if total_valid_votes == 0:
             await thread.send("⚖️ No valid votes cast. No one executed.")
             return poll_message
 
         executed_target_name = None
         highest_vote_count = 0
+        majority_threshold = total_valid_votes / 2.0
 
         for target_name, votes in results.items():
             if votes > highest_vote_count:
                 highest_vote_count = votes
-            if votes > (total_valid_votes / 2.0):
+            # Strict majority check
+            if votes > majority_threshold:
                 executed_target_name = target_name
 
+        # 8. Announce and Apply State Changes
         if executed_target_name is None:
-            await thread.send(f"⚖️ No option received > 50% (Highest: {highest_vote_count}/{total_valid_votes}). No execution.")
+            await thread.send(f"⚖️ No option received a majority (>50%). Highest was {highest_vote_count}/{total_valid_votes}. No execution.")
         elif executed_target_name == "Skip Vote":
             await thread.send(f"⚖️ The majority ({results['Skip Vote']}/{total_valid_votes}) chose to skip. No execution.")
         else:
@@ -160,11 +190,12 @@ class PollManager:
             
             # Update the Game State
             try:
-                p = self.game.get_player_by_name(executed_target_name)
-                p.status.alive = False
-                self.game.executed_player = executed_target_name
-            except ValueError as e:
-                await thread.send(f"⚠️ Error: Could not find player.")
+                p = self.game.get_player(executed_target_name)
+                if p: 
+                    p.status.alive = False
+                self.game.mgr_day.executed_player = executed_target_name
+            except ValueError:
+                await thread.send("⚠️ Error: Could not find player data to update status.")
 
         print(self.game.get_board_str())
         return poll_message

@@ -14,21 +14,22 @@ class ImpBehavior(RoleBehavior):
     other_night_priority = 5
 
     async def act(self, player: Player, game: GameManager) -> None:
-        prompt = f"Who do you want to kill?"
+        prompt = f"Who do you want to kill? ⚔️"
         
         # FIXED: Replaced terminal input with discord dropdown
-        target_list = [p.player_name for p in game.players if p.status.alive and p != player]
-        user_sel = await game.command_cog.dmdropdown(player.player_name, prompt, target_list, 1)
+        target_list = [p.username for p in game.get_players() if p.status.alive and p != player]
+        print("Imp usrname " + player.username)
+        user_sel = await game.send_query(player.username, prompt, target_list, 1)
         
         if not user_sel:
             return # Player made no selection
 
-        target = game.get_player_by_name(user_sel[0])
+        target = game.get_player(user_sel[0])
         
         if target and not target.status.is_protected:
             target.status.alive = False
             game.killed_tonight = target 
-            print(f"{target.player_name} died.")
+            messgae = f"{target.username} died. ⚰️"
         elif target and target.status.is_protected:
-            print(f"{target.player_name} was protected by the Monk and survives.")
-        print(f"Put {player.believed_role} to sleep.")
+            messgae = f"{target.username} was protected by the Monk and survives. ⚰️"
+        return
