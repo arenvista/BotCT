@@ -17,6 +17,7 @@ from botc import Player, Alignment
 from botc.enums import RoleName, RoleClass
 from botc.discord_manager.views import JoinLobbyView, DropdownView
 from botc.discord_manager.polling import PollManager
+import json
 
 
 class GameCommands(commands.Cog):
@@ -79,7 +80,7 @@ class GameCommands(commands.Cog):
             ephemeral=True
         )
 
-    async def dmdropdown(self, user_name: str, message_text: str, options: List[str], max_selection: int) -> Optional[List[str]]:
+    async def query_user_dropdown(self, user_name: str, message_text: str, options: List[str], max_selection: int) -> Optional[List[str]]:
         options = list(set(options))
         if len(options) > 25:
             print("Too Many Options!")
@@ -108,17 +109,17 @@ class GameCommands(commands.Cog):
         if is_timeout:
             try:
                 view.select.disabled = True
-                await message.edit(content="⏳ **Time expired.**", view=view)
+                await message.edit(content="**Time expired.**", view=view)
             except discord.HTTPException:
                 pass
             return None
             
         return view.selected_values
 
-    async def dmpoll(self, user_name: str, poll_message: str, poll_options: List[str], max_selection: int) -> Optional[List[str]]:
+    async def query_user(self, user_name: str, poll_message: str, poll_options: List[str], max_selection: int) -> Optional[List[str]]:
         poll_options = list(set(poll_options))
         if len(poll_options) > 10 or max_selection == 1:
-            return await self.dmdropdown(user_name, poll_message, poll_options, max_selection)
+            return await self.query_user_dropdown(user_name, poll_message, poll_options, max_selection)
         
         clean_name: str = user_name.lstrip('@').lower()
         
@@ -179,7 +180,7 @@ class GameCommands(commands.Cog):
         if selected_count > max_selection:
             await live_message.end_poll() 
             await user.send(f"⚠️ **Oops!** You selected {selected_count} options, but the limit is {max_selection}. Let's try again.")
-            return await self.dmpoll(user_name, poll_message, poll_options, max_selection)
+            return await self.query_user_dropdown(user_name, poll_message, poll_options, max_selection)
             
         try:
             await live_message.end_poll()
@@ -257,21 +258,13 @@ A new game is forming! Click the button below to join the town.
     @app_commands.default_permissions(manage_roles=True)
     async def start_game(self, interaction: discord.Interaction) -> None:
         num_players: int = len(self.game.mgr_player.player_names)
-        # if num_players < 5:  # Fixed from < 0
-        #     await interaction.response.send_message(f"❌ You need at least 5 to play!", ephemeral=True)
-        #     return
+
             
         await interaction.response.send_message("🔒 **The lobby is closed!** Starting GM Poll...")
         poll: PollManager = PollManager(self.game)
         self.game.game_master = await poll.run_gamemaster_poll(interaction)
 
-        # # Testing End Start
-        # ROLES_DEMONS = RoleName.get_by_class(RoleClass.DEMONS)
-        # ROLES_MINIONS = RoleName.get_by_class(RoleClass.MINIONS)
-        # ROLES_OUTSIDERS = RoleName.get_by_class(RoleClass.OUTSIDERS)
-        # ROLES_TOWNSFOLK = RoleName.get_by_class(RoleClass.TOWNSFOLK)
-        # targets = ROLES_DEMONS + ROLES_MINIONS + ROLES_OUTSIDERS + ROLES_TOWNSFOLK[:-10]
-        # for r in targets:
+
         if "TESTING" in os.environ and os.environ["TESTING"]=="1":
             r = RoleName.KLUTZ
             self.game.mgr_player.player_list.append(Player("iiiii5184", r, r, Alignment.GOOD))
@@ -281,12 +274,20 @@ A new game is forming! Click the button below to join the town.
             self.game.mgr_player.player_list.append(Player("microsina", r, r, Alignment.EVIL))
             r = RoleName.SOLDIER
             self.game.mgr_player.player_list.append(Player("bakerthebread", r, r, Alignment.GOOD))
-        # targets = ROLES_MINIONS + ROLES_OUTSIDERS + ROLES_TOWNSFOLK
-        # counter = 0
-        # for r in targets[0:3]:
-        #     counter += 1
-        #     self.game.mgr_player.player_list.append(Player(f"Test{counter}", r, r, Alignment.GOOD))
-        # Testing End
+        if "MAPPING" in os.environ:
+            print("mapped")
+            with open(os.environ["MAPPING"],"r") as file:
+                mapping=json.load(file)
+                print(mapping)
+                evil_classes= RoleName.get_by_class(RoleClass.DEMONS)+RoleName.get_by_class(RoleClass.MINIONS)
+                for name,num in mapping.items():
+                    if RoleName(num) in evil_classes:
+                        align=Alignment.EVIL
+                    else:
+                        align=Alignment.GOOD
+                    self.game.mgr_player.player_list.append(Player(name,RoleName(num),RoleName(num),align))
+
+
 
         await self.game.start_game(interaction)
 

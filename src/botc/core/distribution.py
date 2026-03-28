@@ -1,6 +1,8 @@
 from typing import List
 from botc import RoleName, RoleClass, Alignment, Player
 import random
+import os
+import json
 
 class RoleDistributor:
     DISTRIBUTION_TABLE = {
@@ -59,9 +61,18 @@ class RoleDistributor:
 
 
         random.shuffle(selected_roles)
+        
+        if "ASSIGN" in os.environ:
+            with open(os.environ["ASSIGN"],"r") as file:
+                assign_map=json.load(file)
+        else:
+            assign_map={}
 
         assigned_players: List[Player] = []
         for player_name, role_enum in zip(self.player_names, selected_roles):
+            
+            if player_name in assign_map:
+                role_enum=assign_map[player_name]
             
             # The Drunk thinks they are a Townsfolk, otherwise everyone believes their actual role
             believed_role = drunk_fake_role if role_enum == RoleName.DRUNK else role_enum
@@ -75,6 +86,8 @@ class RoleDistributor:
             assigned_players.append(
                 Player(player_name, believed_role, registered_role, registered_alignment)
             )
+            
+        
 
         if RoleName.FORTUNE_TELLER in chosen_townsfolk:
             red_herring_index = random.randint(0,len(chosen_townsfolk)-1)
