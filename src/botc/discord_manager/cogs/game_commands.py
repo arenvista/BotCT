@@ -268,7 +268,7 @@ class GameCommands(commands.Cog):
         # r = RoleName.SLAYER
         # self.game.mgr_player.player_list.append(Player("microsina", r, r, Alignment.GOOD))
         r = RoleName.SOLDIER
-        self.game.mgr_player.player_list.append(Player("bakerthebread", r, r, Alignment.GOOD))
+        # self.game.mgr_player.player_list.append(Player("bakerthebread", r, r, Alignment.GOOD))
         # targets = ROLES_MINIONS + ROLES_OUTSIDERS + ROLES_TOWNSFOLK
         # counter = 0
         # for r in targets[0:3]:
@@ -282,14 +282,16 @@ class GameCommands(commands.Cog):
         targets = ROLES_DEMONS + ROLES_MINIONS + ROLES_OUTSIDERS + ROLES_TOWNSFOLK[:-10]
 
         # for i, r in enumerate(targets):        
-        self.game.mgr_player.player_list.append(Player(f"temp1", RoleName.EMPATH, RoleName.EMPATH, Alignment.GOOD))
-        self.game.mgr_player.player_list.append(Player(f"microsina", RoleName.IMP, RoleName.IMP, Alignment.EVIL))
-        self.game.mgr_player.player_list.append(Player(f"temp1", RoleName.SCARLET_WOMAN, RoleName.SCARLET_WOMAN, Alignment.EVIL))
-        self.game.mgr_player.player_list.append(Player(f"microsina", RoleName.RAVENKEEPER, RoleName.RAVENKEEPER, Alignment.GOOD))
+        # self.game.mgr_player.player_list.append(Player(f"temp1", RoleName.EMPATH, RoleName.EMPATH, Alignment.GOOD))
+        self.game.mgr_player.player_list.append(Player(f"microsina", RoleName.UNDERTAKER, RoleName.UNDERTAKER, Alignment.GOOD))
+        self.game.mgr_player.player_list.append(Player(f"temp2", RoleName.IMP, RoleName.IMP, Alignment.EVIL))
+        # self.game.mgr_player.player_list.append(Player(f"temp1", RoleName.IMP, RoleName.IMP, Alignment.EVIL))
         self.game.mgr_player.player_list.append(Player(f"temp3", RoleName.SCARLET_WOMAN, RoleName.SCARLET_WOMAN, Alignment.EVIL))
         self.game.mgr_player.player_list.append(Player(f"temp5", RoleName.VIRGIN, RoleName.VIRGIN, Alignment.GOOD))
         self.game.mgr_player.player_list.append(Player(f"temp6", RoleName.DRUNK, RoleName.DRUNK, Alignment.GOOD))
-        self.game.mgr_player.player_list.append(Player(f"temp7", RoleName.FORTUNE_TELLER, RoleName.FORTUNE_TELLER, Alignment.GOOD))
+        self.game.mgr_player.player_list.append(Player(f"temp7", RoleName.SOLDIER, RoleName.SOLDIER, Alignment.GOOD))
+        self.game.mgr_player.player_list.append(Player(f"temp8", RoleName.MAYOR, RoleName.MAYOR, Alignment.GOOD))
+        
 
 
 

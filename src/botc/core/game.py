@@ -197,8 +197,10 @@ class GameManager:
     async def start_game(self, interaction: discord.Interaction):
         # await self.assign_roles()
         await self.message_roles_to_players()
-        await self.night_events()
-        await self.day_events(interaction)
+        
+        while self.game_over != True:
+            await self.night_events()
+            await self.day_events(interaction)
 
 
     def get_alive_neighbors(self, target_player: Player) -> Tuple[Player, Player]:

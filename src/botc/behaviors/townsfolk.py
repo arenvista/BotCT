@@ -362,7 +362,7 @@ class FortuneTellerBehavior(RoleBehavior):
 class RavenkeeperBehavior(RoleBehavior):
     other_night_priority = 6
     async def act(self, player: Player, game: GameManager) -> None:
-        if game.killed_tonight == player.username:
+        if game.killed_tonight.username == player.username:
             target_list = get_filtered_players(game, excluded_players={player})
             sel = await game.send_query(player.username, "You died! Select a player to view their role:", [p.username for p in target_list], 1)
             
