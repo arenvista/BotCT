@@ -286,6 +286,8 @@ A new game is forming! Click the button below to join the town.
                     else:
                         align=Alignment.GOOD
                     self.game.mgr_player.player_list.append(Player(name,RoleName(num),RoleName(num),align))
+                for p in self.game.mgr_player.player_list:
+                    print(p.username,p.registered_role)
 
 
 
