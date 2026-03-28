@@ -153,11 +153,7 @@ class GameManager:
         for player in self.mgr_player.player_list: 
             player.status.resolve_temporary_conditions()
 
-<<<<<<< HEAD
     async def send_query(self, username, message, choices, max_input):
-=======
-    async def send_query(self, username: str, message: str, choices: List[str], max_input: int) -> Optional[List[str]]:
->>>>>>> behavior_updates
         return await self.mgr_discord.send_query(username, message, choices, max_input)
 
     async def send_message(self, username, content):
@@ -182,7 +178,6 @@ class GameManager:
         else:
             for player in self.mgr_night.get_wake_order(False):
                 await player.take_action(self)
-<<<<<<< HEAD
         self.counter.night += 1
 
     async def message_relevant_roles(self):
@@ -204,9 +199,6 @@ class GameManager:
         await self.message_roles_to_players()
         await self.night_events()
         await self.day_events(interaction)
-=======
-            
->>>>>>> behavior_updates
 
 
     def get_alive_neighbors(self, target_player: Player) -> Tuple[Player, Player]:
