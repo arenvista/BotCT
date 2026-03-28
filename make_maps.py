@@ -12,13 +12,14 @@ for n in range(24):
     output={
             args.name: n,
     "chudbotc0":10,
-    "chudbotc1":10,
-    "chudbotc2":10,
+    "chudbotc1":4,
+    "chudbotc2":7,
     "chudbotc3":10
     }
     try:
         print(RoleName(n).display_name)
-        with open(f"maps/{RoleName(n).display_name}.json","w") as file:
+        name=RoleName(n).display_name.replace(" ","_")
+        with open(f"maps/{name}.json","w") as file:
             json.dump(output,file)
     except:
         pass
