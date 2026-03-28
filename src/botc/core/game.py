@@ -169,10 +169,10 @@ class GameManager:
         await self.mgr_day.start_voting_phase(interaction)
 
     async def night_events(self):
-        if self.counter.night == 1:
+        if self.counter.night == 0:
             #Start of 1st Night
             for player in self.mgr_night.get_wake_order(True):
-                print("Calling " + player.registered_role.role_class.__str__())
+                print("Calling " + player.registered_role.display_name)
                 await player.take_action(self)
         else:
             for player in self.mgr_night.get_wake_order(False):
