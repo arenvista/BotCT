@@ -10,6 +10,7 @@ from botc.core.distribution import RoleDistributor
 from botc.encounters import Deck
 
 # Import Discord components
+import discord
 from botc.discord_manager.bot import BotManager
 from botc.discord_manager.polling import PollManager
 from botc.discord_manager.cogs.game_commands import GameCommands
@@ -17,16 +18,16 @@ from botc.discord_manager.cogs.game_commands import GameCommands
 from dataclasses import dataclass
 
 
-class EventManager:
-    def __init__(self):
-        self.event_interval = 1  # how frequently to do an event, hardcoded for now
-        self.event_deck = Deck.from_json("default")
+# class EventManager:
+#     def __init__(self):
+#         self.event_interval = 1  # how frequently to do an event, hardcoded for now
+#         self.event_deck = Deck.from_json("default")
 
-    # def CallEvent(self, game: 'GameManager'):
-    #     if self.event_deck:
-    #         card = self.event_deck.draw_card()
-    #         await interaction.channel.send(card.specific_encounter.flavor_text) 
-    #         await card.specific_encounter.resolve(self)
+#     async def CallEvent(self, game: 'GameManager', interaction: discord.interactions):
+#         if self.event_deck:
+#             card = self.event_deck.draw_card()
+#             await interaction.channel.send(card.specific_encounter.flavor_text) 
+#             await card.specific_encounter.resolve(self)
 
 @dataclass
 class Counters:
@@ -122,7 +123,7 @@ class DiscordManager:
         await self.command_cog.send_direct_message(username, content)
 
     async def send_query(self, target: str, message: str, choices: List[str], max_input: int):
-        return await self.command_cog.dmpoll(target, message, choices, max_input)
+        return await self.command_cog.query_user(target, message, choices, max_input)
 
     def run_bot(self):
         self.bot.run(self.token)
@@ -152,7 +153,11 @@ class GameManager:
         for player in self.mgr_player.player_list: 
             player.status.resolve_temporary_conditions()
 
+<<<<<<< HEAD
     async def send_query(self, username, message, choices, max_input):
+=======
+    async def send_query(self, username: str, message: str, choices: List[str], max_input: int) -> Optional[List[str]]:
+>>>>>>> behavior_updates
         return await self.mgr_discord.send_query(username, message, choices, max_input)
 
     async def send_message(self, username, content):
@@ -177,6 +182,7 @@ class GameManager:
         else:
             for player in self.mgr_night.get_wake_order(False):
                 await player.take_action(self)
+<<<<<<< HEAD
         self.counter.night += 1
 
     async def message_relevant_roles(self):
@@ -198,6 +204,9 @@ class GameManager:
         await self.message_roles_to_players()
         await self.night_events()
         await self.day_events(interaction)
+=======
+            
+>>>>>>> behavior_updates
 
 
     def get_alive_neighbors(self, target_player: Player) -> Tuple[Player, Player]:
