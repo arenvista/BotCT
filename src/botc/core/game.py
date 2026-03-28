@@ -152,7 +152,7 @@ class GameManager:
         for player in self.mgr_player.player_list: 
             player.status.resolve_temporary_conditions()
 
-    async def send_query(self, username, message, choices, max_input):
+    async def send_query(self, username: str, message: str, choices: List[str], max_input: int):
         return await self.mgr_discord.send_query(username, message, choices, max_input)
 
     async def send_message(self, username, content):
@@ -161,7 +161,6 @@ class GameManager:
     async def message_roles_to_players(self):
         for player in self.get_players():
             await self.send_message(player.username, player.show_role())
-
 
     async def day_events(self, interaction: discord.Interaction):
         self.counter.day += 1
@@ -179,10 +178,11 @@ class GameManager:
                 await player.take_action(self)
         self.counter.night += 1
 
+
     async def message_relevant_roles(self):
         player_spy = self.get_players(filter_roles=[RoleName.SPY])[0]
         spy_opts = []
-        await self.send_query(self.game_master, "", spy_opts, 1)
+        await self.send_query(self.game_master, "Pick a role to be assigned", spy_opts, 1)
 
         player_recluse = self.get_players(filter_roles=[RoleName.RECLUSE])[0]
         rec_opts = []

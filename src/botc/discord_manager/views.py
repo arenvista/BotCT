@@ -7,12 +7,13 @@ if TYPE_CHECKING:
     from botc.core.game import GameManager
 
 class ExecutionDropdown(discord.ui.Select):
-    def __init__(self, alive_players):
+    def __init__(self, alive_players: List[str]):
         options = []
         # Add all alive players as options
-        for player in alive_players:
+        alive_players = list(set(alive_players))
+        for usrname in alive_players:
             options.append(discord.SelectOption(
-                label=player.username, 
+                label=usrname, 
                 description="Vote to execute this player", 
                 emoji="🖊️"
             ))
@@ -44,7 +45,7 @@ class ExecutionDropdown(discord.ui.Select):
 class ExecutionView(discord.ui.View):
     def __init__(self, alive_players):
         super().__init__(timeout=None)
-        self.dropdown = ExecutionDropdown(alive_players)
+        self.dropdown = ExecutionDropdown([p.username for p in alive_players])
         self.add_item(self.dropdown)
 
 class JoinLobbyView(discord.ui.View):

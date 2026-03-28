@@ -74,10 +74,13 @@ class RoleName(Enum):
     SCARLET_WOMAN = (4, RoleClass.MINIONS)
 
     # Outsiders
-    BUTLER = (5, RoleClass.OUTSIDERS)
+    # BUTLER = (5, RoleClass.OUTSIDERS)
+    MOONCHILD = (5, RoleClass.OUTSIDERS)
     DRUNK = (6, RoleClass.OUTSIDERS)
-    RECLUSE = (7, RoleClass.OUTSIDERS)
-    SAINT = (8, RoleClass.OUTSIDERS)
+    # RECLUSE = (7, RoleClass.OUTSIDERS)
+    SWEETHEART = (7, RoleClass.OUTSIDERS)
+    # SAINT = (8, RoleClass.OUTSIDERS)
+    KLUTZ = (8, RoleClass.OUTSIDERS)
 
     # Townsfolk
     WASHERWOMAN = (9, RoleClass.TOWNSFOLK)

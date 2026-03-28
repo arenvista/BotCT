@@ -19,7 +19,7 @@ class Player:
         self.role_behavior: RoleBehavior = BEHAVIOR_MAP.get(self.believed_role, PassiveBehavior())
 
     def show_role(self):
-        output = f"""Hi {self.username}, you are the {self.believed_role}"""
+        output = f"""Hi {self.username}, you are the {self.believed_role}\n> ### How To Play:\nhttps://wiki.bloodontheclocktower.com/{self.believed_role}"""
         return output
 
     def _default_alignment(self) -> Alignment:

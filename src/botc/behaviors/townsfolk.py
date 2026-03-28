@@ -8,7 +8,7 @@ if TYPE_CHECKING:
     from botc.core.game import GameManager
 
 from botc.enums import RoleName, Alignment, RoleClass
-from .base import RoleBehavior, InfoRoleBehavior, ActionRoleBehavior, PassiveBehavior
+from .base import RoleBehavior, InfoRoleBehavior, ActionRoleBehavior, PassiveBehavior, message_death
 from . import register_role
 
 ROLES_DEMONS = RoleName.get_by_class(RoleClass.DEMONS)
@@ -83,6 +83,9 @@ class WasherwomanBehavior(InfoRoleBehavior):
             msg = f"One of {players[0]} and {players[1]} is the {night_data.get('role')}."
             await game.send_message(player.username, msg)
 
+    @message_death
+    async def die(self, player: Player, game: GameManager):
+        pass
 
 @register_role(RoleName.LIBRARIAN)
 class LibrarianBehavior(InfoRoleBehavior):
@@ -112,6 +115,9 @@ class LibrarianBehavior(InfoRoleBehavior):
         else:
             random.shuffle(players)
             await game.send_message(player.username, f"One of {players[0]} and {players[1]} is the {night_data.get('role')}.")
+    @message_death
+    async def die(self, player: Player, game: GameManager):
+        pass
 
 
 @register_role(RoleName.CHEF)
@@ -144,6 +150,9 @@ class ChefBehavior(InfoRoleBehavior):
 
     async def send_result(self, player: Player, game: GameManager, night_data: Dict[str, Any]) -> None:
         await game.send_message(player.username, f"There are {night_data.get('pairs')} pairs of evil players.")
+    @message_death
+    async def die(self, player: Player, game: GameManager):
+        pass
 
 
 @register_role(RoleName.UNDERTAKER)
@@ -176,6 +185,9 @@ class UndertakerBehavior(InfoRoleBehavior):
         if "role" in night_data:
             msg = f"The player executed today was the {night_data['role']}."
             await game.send_message(player.username, msg)
+    @message_death
+    async def die(self, player: Player, game: GameManager):
+        pass
 
 
 # ==========================================
@@ -205,6 +217,9 @@ class MonkBehavior(ActionRoleBehavior):
     async def execute_action(self, player: Player, target: Player, game: GameManager) -> None:
         target.status.protected = True
         print(f"{target.username} protected by Monk.")
+    @message_death
+    async def die(self, player: Player, game: GameManager):
+        pass
 
 
 # ==========================================
@@ -242,6 +257,9 @@ class FortuneTellerBehavior(RoleBehavior):
 
         msg = "YES" if has_demon else "NO"
         await game.send_message(player.username, f"Demon presence: {msg}")
+    @message_death
+    async def die(self, player: Player, game: GameManager):
+        pass
 
 
 @register_role(RoleName.RAVENKEEPER)
@@ -260,6 +278,9 @@ class RavenkeeperBehavior(RoleBehavior):
                 else:
                     fake_role = random.choice([r for r in RoleName if r != target.registered_role])
                     await game.send_message(player.username, f"{target.username} is the {fake_role}.")
+    @message_death
+    async def die(self, player: Player, game: GameManager):
+        pass
 
 
 # ==========================================
@@ -269,15 +290,27 @@ class RavenkeeperBehavior(RoleBehavior):
 @register_role(RoleName.VIRGIN)
 class VirginBehavior(PassiveBehavior):
     pass # Triggered during nominations in the Day Phase
+    @message_death
+    async def die(self, player: Player, game: GameManager):
+        pass
 
 @register_role(RoleName.SLAYER)
 class SlayerBehavior(PassiveBehavior):
     pass # Triggered via bot command during the Day Phase
+    @message_death
+    async def die(self, player: Player, game: GameManager):
+        pass
 
 @register_role(RoleName.SOLDIER)
 class SoldierBehavior(PassiveBehavior):
     pass # Status handled by Imp's kill check
+    @message_death
+    async def die(self, player: Player, game: GameManager):
+        pass
 
 @register_role(RoleName.MAYOR)
 class MayorBehavior(PassiveBehavior):
     pass # Triggered at the end of the execution phase
+    @message_death
+    async def die(self, player: Player, game: GameManager):
+        pass

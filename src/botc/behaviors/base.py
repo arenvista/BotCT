@@ -1,6 +1,6 @@
 # src/botc/behaviors/base.py
 from __future__ import annotations
-
+from functools import wraps
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, Dict, Optional
 
@@ -10,6 +10,31 @@ from . import register_role
 if TYPE_CHECKING:
     from botc.core.game import GameManager
     from botc.player import Player
+
+from functools import wraps # Highly recommended to preserve method names/docstrings
+
+
+def message_self(func):
+    @wraps(func)
+    async def wrapper(self, player: Player, game: GameManager, *args, **kwargs):
+        # Execute any specific logic the role might have upon dying first
+        result: str = await func(self, player, game, *args, **kwargs)
+        await game.send_message(player.username, result)
+        return result
+    return wrapper
+
+def message_death(func):
+    @wraps(func)
+    async def wrapper(self, player: Player, game: GameManager, *args, **kwargs):
+        # Execute any specific logic the role might have upon dying first
+        result = await func(self, player, game, *args, **kwargs)
+        
+        # Broadcast the death and update state
+        await game.send_message(player.username, "You have died!")
+        player.status.alive = False
+        
+        return result
+    return wrapper
 
 class RoleBehavior(ABC):
     """The absolute root of all roles."""
@@ -40,12 +65,19 @@ class RoleBehavior(ABC):
         return gm_skip is not None and gm_skip[0] == "No"
 
 
+    async def kill(self, target: Player, game: GameManager):
+        await target.role_behavior.die(target,game)
+
 
     @abstractmethod
     async def act(self, player: Player, game: GameManager) -> Any:
         """Every role must do *something* at night."""
         pass
 
+
+    @abstractmethod
+    async def die(self, player: Player, game: GameManager) -> Any:
+        pass
 
 # --- THE ARCHETYPES ---
 
@@ -83,6 +115,7 @@ class InfoRoleBehavior(RoleBehavior):
     async def get_manual_dishonest( self, player: Player, game: GameManager, default_data: Dict[str, Any]) -> Dict[str, Any]: pass
     @abstractmethod
     async def send_result( self, player: Player, game: GameManager, night_data: Dict[str, Any]) -> None: pass
+    async def die(self, player: Player, game: GameManager) -> Any: pass
 
 
 class ActionRoleBehavior(RoleBehavior):
@@ -101,6 +134,7 @@ class ActionRoleBehavior(RoleBehavior):
     async def get_manual_target( self, player: Player, game: GameManager) -> Optional[Player]: pass
     @abstractmethod
     async def execute_action( self, player: Player, target: Player, game: GameManager) -> None: pass
+    async def die(self, player: Player, game: GameManager) -> Any: pass
 
 
 class PassiveBehavior(RoleBehavior):
@@ -109,3 +143,4 @@ class PassiveBehavior(RoleBehavior):
     (e.g., passive Outsiders, Day-acting roles)
     """
     async def act(self, player: Player, game: GameManager) -> None: pass
+    async def die(self, player: Player, game: GameManager) -> Any: pass

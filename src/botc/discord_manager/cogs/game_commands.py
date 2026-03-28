@@ -237,7 +237,17 @@ class GameCommands(commands.Cog):
         
         embed: discord.Embed = discord.Embed(
             title="🩸 Blood on the Clocktower",
-            description="A new game is forming! Click the button below to join the town.",
+            description="""
+# Introduction 
+A long time ago in the sleepy town of Ravenswood Bluff, during a hellish thunderstorm, on the stroke of midnight... you hear a scream. Rushing to the Town Square to investigate, you find your beloved Storyteller, myself, has been murdered... impaled on the hour hand of the clocktower, blood dripping onto the cobblestones below. You assume that this is the work of a Demon, and you are correct—a Demon that kills by night and takes on human form by day. 
+
+# Rules
+1. You may say whatever you want at any time. This is a talking game. You can talk publicly with the group or have private conversations, it is up to you.
+2. No peeking. Please keep your character token a secret, and never look into the Grimoire, as it contains all the game characters. If you see something you shouldn’t, it will spoil the fun.
+3. Ask me any questions you need to. If you get confused, or don’t understand how your character works, or don’t understand how the character that you are pretending to be works, or if something happens at night that you don’t understand, or you just need some strategy advice... whatever it is, please ask. I’m neutral, and my job is to help you understand the rules and have fun playing. Let me know when you have a question, and we can talk in private so that nobody knows what question you asked. 
+
+A new game is forming! Click the button below to join the town.
+            """,
             color=discord.Color.dark_red()
         )
         await interaction.response.send_message(embed=embed, view=view)
@@ -260,13 +270,13 @@ class GameCommands(commands.Cog):
         # ROLES_OUTSIDERS = RoleName.get_by_class(RoleClass.OUTSIDERS)
         # ROLES_TOWNSFOLK = RoleName.get_by_class(RoleClass.TOWNSFOLK)
         # targets = ROLES_DEMONS + ROLES_MINIONS + ROLES_OUTSIDERS + ROLES_TOWNSFOLK[:-10]
-        
-        # Fixed: Append directly to the actual state, not a filtered copy
-        # for r in targets: 
-        # r = RoleName.IMP
-        # self.game.mgr_player.player_list.append(Player("iiiii5184", r, r, Alignment.GOOD))
-        # r = RoleName.SLAYER
-        # self.game.mgr_player.player_list.append(Player("microsina", r, r, Alignment.GOOD))
+        # for r in targets:
+        r = RoleName.KLUTZ
+        self.game.mgr_player.player_list.append(Player("iiiii5184", r, r, Alignment.GOOD))
+        r = RoleName.IMP
+        self.game.mgr_player.player_list.append(Player("iiiii5184", r, r, Alignment.GOOD))
+        r = RoleName.SLAYER
+        self.game.mgr_player.player_list.append(Player("microsina", r, r, Alignment.EVIL))
         r = RoleName.SOLDIER
         self.game.mgr_player.player_list.append(Player("bakerthebread", r, r, Alignment.GOOD))
         # targets = ROLES_MINIONS + ROLES_OUTSIDERS + ROLES_TOWNSFOLK

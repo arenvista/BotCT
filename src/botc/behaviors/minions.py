@@ -9,7 +9,7 @@ if TYPE_CHECKING:
 from botc.enums import Alignment, RoleName
 
 from . import BEHAVIOR_MAP, register_role
-from .base import RoleBehavior
+from .base import RoleBehavior, message_death
 
 
 @register_role(RoleName.POISONER)
@@ -41,6 +41,10 @@ class PoisonerBehavior(RoleBehavior):
         print(f"Put {player.believed_role} to sleep.")
         await game.send_message(player.username, game.get_board_str())
 
+    @message_death
+    async def die(self, player: Player, game: GameManager):
+        pass
+
 @register_role(RoleName.SPY)
 class SpyBehavior(RoleBehavior):
     first_night_priority = 2
@@ -49,6 +53,9 @@ class SpyBehavior(RoleBehavior):
     async def act(self, player: Player, game: GameManager) -> None:
         await game.send_message( player.username, game.get_board_str())
 
+    @message_death
+    async def die(self, player: Player, game: GameManager):
+        pass
 
 @register_role(RoleName.SCARLET_WOMAN)
 class ScarletWomanBehavior(RoleBehavior):
@@ -65,3 +72,7 @@ class ScarletWomanBehavior(RoleBehavior):
             player.registered_alignment = Alignment.EVIL
             player.role_behavior = BEHAVIOR_MAP[RoleName.IMP]
             await game.send_message(player.username, prompt)
+
+    @message_death
+    async def die(self, player: Player, game: GameManager):
+        pass
