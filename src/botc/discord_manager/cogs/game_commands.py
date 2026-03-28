@@ -283,7 +283,8 @@ class GameCommands(commands.Cog):
 
         # for i, r in enumerate(targets):        
         # self.game.mgr_player.player_list.append(Player(f"temp1", RoleName.EMPATH, RoleName.EMPATH, Alignment.GOOD))
-        self.game.mgr_player.player_list.append(Player(f"microsina", RoleName.UNDERTAKER, RoleName.UNDERTAKER, Alignment.GOOD))
+        self.game.mgr_player.player_list.append(Player(f"bakerthebread", RoleName.UNDERTAKER, RoleName.UNDERTAKER, Alignment.GOOD))
+        self.game.mgr_player.player_list.append(Player("chudbotc1",RoleName.IMP, RoleName.IMP, Alignment.EVIL))
         self.game.mgr_player.player_list.append(Player(f"temp2", RoleName.IMP, RoleName.IMP, Alignment.EVIL))
         # self.game.mgr_player.player_list.append(Player(f"temp1", RoleName.IMP, RoleName.IMP, Alignment.EVIL))
         self.game.mgr_player.player_list.append(Player(f"temp3", RoleName.SCARLET_WOMAN, RoleName.SCARLET_WOMAN, Alignment.EVIL))
