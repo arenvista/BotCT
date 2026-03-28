@@ -179,8 +179,22 @@ class GameManager:
                 await player.take_action(self)
         self.counter.night += 1
 
+    async def message_relevant_roles(self):
+        player_spy = self.get_players(filter_roles=[RoleName.SPY])[0]
+        spy_opts = []
+        await self.send_query(self.game_master, "", spy_opts, 1)
+
+        player_recluse = self.get_players(filter_roles=[RoleName.RECLUSE])[0]
+        rec_opts = []
+        await self.send_query(self.game_master, "", rec_opts, 1)
+
+    async def assign_roles(self):
+        self.mgr_player.assign_roles()
+        if self.game_master != "":
+            await self.message_relevant_roles()
+
     async def start_game(self, interaction: discord.Interaction):
-        # self.mgr_player.assign_roles()
+        # await self.assign_roles()
         await self.message_roles_to_players()
         await self.night_events()
         await self.day_events(interaction)

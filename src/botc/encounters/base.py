@@ -17,9 +17,6 @@ def register_encounter(encounter_name,dependency_names,anti_dependency_names):
 
 class Encounter(ABC):
     
-    
-    
-    
     def __init__(self,name:str,dependency_names:List[str],anti_dependency_names:List[str]):
         super().__init__()
         self.dependency_names=dependency_names

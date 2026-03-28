@@ -263,10 +263,10 @@ class GameCommands(commands.Cog):
         
         # Fixed: Append directly to the actual state, not a filtered copy
         # for r in targets: 
-        r = RoleName.IMP
-        self.game.mgr_player.player_list.append(Player("iiiii5184", r, r, Alignment.GOOD))
-        r = RoleName.SLAYER
-        self.game.mgr_player.player_list.append(Player("microsina", r, r, Alignment.GOOD))
+        # r = RoleName.IMP
+        # self.game.mgr_player.player_list.append(Player("iiiii5184", r, r, Alignment.GOOD))
+        # r = RoleName.SLAYER
+        # self.game.mgr_player.player_list.append(Player("microsina", r, r, Alignment.GOOD))
         r = RoleName.SOLDIER
         self.game.mgr_player.player_list.append(Player("bakerthebread", r, r, Alignment.GOOD))
         # targets = ROLES_MINIONS + ROLES_OUTSIDERS + ROLES_TOWNSFOLK
