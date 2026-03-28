@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING, List, Optional
 import datetime
 import asyncio
 import re
+import os
 
 import discord
 from discord.ext import commands
@@ -271,14 +272,15 @@ A new game is forming! Click the button below to join the town.
         # ROLES_TOWNSFOLK = RoleName.get_by_class(RoleClass.TOWNSFOLK)
         # targets = ROLES_DEMONS + ROLES_MINIONS + ROLES_OUTSIDERS + ROLES_TOWNSFOLK[:-10]
         # for r in targets:
-        r = RoleName.KLUTZ
-        self.game.mgr_player.player_list.append(Player("iiiii5184", r, r, Alignment.GOOD))
-        r = RoleName.IMP
-        self.game.mgr_player.player_list.append(Player("iiiii5184", r, r, Alignment.GOOD))
-        r = RoleName.SLAYER
-        self.game.mgr_player.player_list.append(Player("microsina", r, r, Alignment.EVIL))
-        r = RoleName.SOLDIER
-        self.game.mgr_player.player_list.append(Player("bakerthebread", r, r, Alignment.GOOD))
+        if "TESTING" in os.environ and os.environ["TESTING"]=="1":
+            r = RoleName.KLUTZ
+            self.game.mgr_player.player_list.append(Player("iiiii5184", r, r, Alignment.GOOD))
+            r = RoleName.IMP
+            self.game.mgr_player.player_list.append(Player("iiiii5184", r, r, Alignment.GOOD))
+            r = RoleName.SLAYER
+            self.game.mgr_player.player_list.append(Player("microsina", r, r, Alignment.EVIL))
+            r = RoleName.SOLDIER
+            self.game.mgr_player.player_list.append(Player("bakerthebread", r, r, Alignment.GOOD))
         # targets = ROLES_MINIONS + ROLES_OUTSIDERS + ROLES_TOWNSFOLK
         # counter = 0
         # for r in targets[0:3]:
