@@ -78,7 +78,7 @@ class GameCommands(commands.Cog):
             ephemeral=True
         )
 
-    async def dmdropdown(self, user_name: str, message_text: str, options: List[str], max_selection: int) -> Optional[List[str]]:
+    async def query_user_dropdown(self, user_name: str, message_text: str, options: List[str], max_selection: int) -> Optional[List[str]]:
         options = list(set(options))
         if len(options) > 25:
             print("Too Many Options!")
@@ -107,17 +107,17 @@ class GameCommands(commands.Cog):
         if is_timeout:
             try:
                 view.select.disabled = True
-                await message.edit(content="⏳ **Time expired.**", view=view)
+                await message.edit(content="**Time expired.**", view=view)
             except discord.HTTPException:
                 pass
             return None
             
         return view.selected_values
 
-    async def dmpoll(self, user_name: str, poll_message: str, poll_options: List[str], max_selection: int) -> Optional[List[str]]:
+    async def query_user(self, user_name: str, poll_message: str, poll_options: List[str], max_selection: int) -> Optional[List[str]]:
         poll_options = list(set(poll_options))
         if len(poll_options) > 10 or max_selection == 1:
-            return await self.dmdropdown(user_name, poll_message, poll_options, max_selection)
+            return await self.query_user_dropdown(user_name, poll_message, poll_options, max_selection)
         
         clean_name: str = user_name.lstrip('@').lower()
         
@@ -178,7 +178,7 @@ class GameCommands(commands.Cog):
         if selected_count > max_selection:
             await live_message.end_poll() 
             await user.send(f"⚠️ **Oops!** You selected {selected_count} options, but the limit is {max_selection}. Let's try again.")
-            return await self.dmpoll(user_name, poll_message, poll_options, max_selection)
+            return await self.query_user_dropdown(user_name, poll_message, poll_options, max_selection)
             
         try:
             await live_message.end_poll()
@@ -260,16 +260,28 @@ class GameCommands(commands.Cog):
         ROLES_OUTSIDERS = RoleName.get_by_class(RoleClass.OUTSIDERS)
         ROLES_TOWNSFOLK = RoleName.get_by_class(RoleClass.TOWNSFOLK)
         targets = ROLES_DEMONS + ROLES_MINIONS + ROLES_OUTSIDERS + ROLES_TOWNSFOLK[:-10]
-        
-        # Fixed: Append directly to the actual state, not a filtered copy
-        for r in targets: 
-            self.game.mgr_player.player_list.append(Player("iiiii5184", r, r, Alignment.GOOD))
 
-        targets = ROLES_MINIONS + ROLES_OUTSIDERS + ROLES_TOWNSFOLK
-        counter = 0
-        for r in targets[0:3]:
-            counter += 1
-            self.game.mgr_player.player_list.append(Player(f"Test{counter}", r, r, Alignment.GOOD))
+        # for i, r in enumerate(targets):        
+        self.game.mgr_player.player_list.append(Player(f"temp1", RoleName.EMPATH, RoleName.EMPATH, Alignment.GOOD))
+        self.game.mgr_player.player_list.append(Player(f"microsina", RoleName.IMP, RoleName.IMP, Alignment.EVIL))
+        self.game.mgr_player.player_list.append(Player(f"temp1", RoleName.SCARLET_WOMAN, RoleName.SCARLET_WOMAN, Alignment.EVIL))
+        self.game.mgr_player.player_list.append(Player(f"microsina", RoleName.RAVENKEEPER, RoleName.RAVENKEEPER, Alignment.GOOD))
+        self.game.mgr_player.player_list.append(Player(f"temp3", RoleName.SCARLET_WOMAN, RoleName.SCARLET_WOMAN, Alignment.EVIL))
+        self.game.mgr_player.player_list.append(Player(f"temp5", RoleName.VIRGIN, RoleName.VIRGIN, Alignment.GOOD))
+        self.game.mgr_player.player_list.append(Player(f"temp6", RoleName.DRUNK, RoleName.DRUNK, Alignment.GOOD))
+        self.game.mgr_player.player_list.append(Player(f"temp7", RoleName.FORTUNE_TELLER, RoleName.FORTUNE_TELLER, Alignment.GOOD))
+
+
+
+
+        # Fixed: Append directly to the actual state, not a filtered copy
+        # for i, r in enumerate(targets): 
+        #     self.game.mgr_player.player_list.append(Player(f"pain{i}", r, r, Alignment.GOOD))
+
+        # targets = ROLES_MINIONS + ROLES_OUTSIDERS + ROLES_TOWNSFOLK
+        
+        # for i, r in enumerate(targets[0:3]):
+        #     self.game.mgr_player.player_list.append(Player(f"suffering{i}", r, r, Alignment.GOOD))
         # Testing End
 
         await self.game.start_game(interaction)
