@@ -118,6 +118,7 @@ class DiscordManager:
         self.bot = BotManager(game)
         self.poll_manager = PollManager(game)
         self.command_cog = GameCommands(self.bot, game)
+        self.game_channel: discord.Interaction = None
 
     async def send_message(self, username, content):
         await self.command_cog.send_direct_message(username, content)
@@ -196,6 +197,8 @@ class GameManager:
 
     async def start_game(self, interaction: discord.Interaction):
         # await self.assign_roles()
+
+        self.mgr_discord.game_channel = interaction
         await self.message_roles_to_players()
         
         while self.game_over != True:
